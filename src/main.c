@@ -34,6 +34,7 @@ int main(void)
 
     scr_init();
     splash_show();
+    net_check();                /* while the splash is up */
     key_get();                  /* consumed: it must not act on the view */
 
     feeds_draw();

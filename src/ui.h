@@ -19,4 +19,14 @@ void help_show(void);           /* draws the help box over the body rows */
 void status_main(const char *left, const char *mid);
 void status_msg(const char *msg);
 
+/* A bar with three fields of the caller's choosing (the probe's). */
+void status_fields(const char *left, const char *mid, const char *right);
+
+/* The card's state, shown in status_main()'s network field: "COGS
+ * 192.168.1.60", "NO COGS CARD", ... Set by net_check(). */
+extern char status_net[24];
+
+/* Find the card and read its link state into status_net. */
+void net_check(void);
+
 #endif

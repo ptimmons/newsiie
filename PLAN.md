@@ -6,7 +6,8 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestone 0 is done (see section 9).
+**Status:** milestones 0 and 1 are done, and milestone 1 is verified on a
+real card (see section 9).
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -20,7 +21,36 @@ code in `~/repos/a2chat` and `~/repos/smbget`.
 | Machine | Enhanced Apple //e, 128K, 80 columns (IIgs in 8-bit mode should work) |
 | OS | ProDOS 8, launched as `NEWSIIE.SYSTEM` |
 | Network | CoGS card, any slot, firmware 1.39 or later, already joined to a network |
+| Boot | **from the CoGS network disk** (the primary setup), or any local ProDOS volume |
 | Feeds | RSS 2.0, RSS 1.0 (RDF), Atom 1.0, over http and https |
+
+### Booting from the CoGS network disk
+
+This is how newsiie is meant to be run, so it is a design rule, not a
+caveat. The card's disk driver and newsiie share one pair of FIFOs, and the
+slot ROM, while it waits for a block, discards any frame that is not its
+reply. So:
+
+1. **No ProDOS call while a stream is open.** A fetch is: open the stream,
+   pull the whole feed into the aux item store, close the stream. Files
+   (the feed list, read markers, saved articles) are read or written only
+   before or after that, never during.
+2. **Nothing unsolicited from the card.** Streams are pull-only, which is
+   one more reason to prefer them over the `HTTP` command's DATA events. If
+   the `HTTP` fallback is ever needed, it runs without `STREAM` and is fully
+   drained before any disk call.
+3. **No soft reset.** `cogs_open` resets only the frame parser and FIFOs.
+   Verified on the real card: after newsiie and the probe each did so, ProDOS
+   went on loading programs from the network disk.
+4. **The volume may be read-only.** Writes to a network disk are HTTP PUTs
+   to the image's origin. The CoGS Image Manager share accepts them;
+   GitHub, the Internet Archive and the a2cogs catalog do not, and the
+   card then reports the disk write-protected (`$2B`). newsiie must treat
+   that as a normal state: keep the feed list in memory, say
+   `DISK IS WRITE-PROTECTED: FEEDS NOT SAVED` once, and carry on.
+5. **Disk I/O is network I/O.** Every block costs a round trip unless it is
+   in the card's cache, so files stay small and are read and written whole,
+   once, rather than block by block during use.
 
 Not in v1: Uthernet II, the ][+ / 40 columns, fetching the linked web page,
 images, podcasts, OPML. Screen columns live in named constants, so 40
@@ -56,8 +86,9 @@ loops, which is why they are assembly.
 
 | Module | Language | Origin |
 |---|---|---|
-| `cogs_io.s` — probe, gated get/put, block read, resync, IRQ off | ca65 | a2chat, unchanged, plus a BULK burst read |
-| `cogs.c` — frames, PING, STATUS, TIME, stream open/read/close, error text | C | new, much smaller than a2chat's (no sockets, no events to track) |
+| `cogs_io.s` — probe, gated get/put, resync, IRQ off | ca65 | **built (M1)**, adapted from a2chat; BULK burst read to come with streams |
+| `cogs.c` — frames, PING, STATUS, TIME, LOCALTIME, RANDOM, HASH, error text | C | **built (M1)**; stream open/read/close come in M2 |
+| `slot.c`, `net.c`, `tick.c`, `fmt.c`, `probe.c` | C | **built (M1)**: slot scan, status-bar link field, VBL frame counter, number/date formatting, the probe program |
 | `auxmem.s` — aux read/write/copy, `/RAM` disconnect | ca65 | a2chat / smbget |
 | `blit.s` + `screen.c` — 80-column row blit, inverse, MouseText, row table | ca65 + C | **built (M0)**; direct screen writes, no `conio` |
 | `kbd.c`, `status.c`, `splash.c`, `help.c`, `feeds.c` | C | **built (M0)** |
@@ -150,6 +181,8 @@ for the native build.
 
 - `NEWSIIE.SYSTEM` — the program.
 - `NEWSIIE.FEEDS` — plain text, one `NAME|URL` per line, editable in ZipEdit.
+  Read once at startup and written once after a change; never while a
+  stream is open (section 1).
   Ships with a few known-good default feeds.
 - `NEWSIIE.READ` — later milestone: a 16-bit hash of each read item's guid.
 
@@ -178,7 +211,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | # | Deliverable | Verified by |
 |---|---|---|
 | 0 ✅ | Repo scaffold, Makefile, linker config, screen primitives, splash, empty Feeds view, status bar, help box, bootable disk | Virtual ][ (splash, Feeds, help, OA-Q to ProDOS) |
-| 1 | `cogs_io.s` + `cogs.c` with host model tests; `cogsprobe` disk: find the card, PING, wait for link, show firmware, IP, time | host tests, then **your card** |
+| 1 ✅ | `cogs_io.s` + `cogs.c` with host model tests; `PROBE.SYSTEM`: find the card, PING, wait for link, show firmware, IP, time, data integrity both ways | host tests ✅, Virtual ][ no-card path ✅, **real card ✅** |
 | 2 | `fetchprobe` disk: `STREAM_OPEN` a URL, dump bytes to the screen, report size, KB/s, and result codes for http, https, a redirecting URL, a 404 | **your card** — settles the risks below |
 | 3 | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests, Virtual ][ |
 | 4 | Item store in aux; Headlines screen with scrolling | suite |
@@ -234,3 +267,51 @@ Milestones 1–2 and 3 are independent and could run in parallel.
 2. Open: is v1 "summaries from the feed" acceptable, with full-article
    fetching left for later? (It would need a text-extraction proxy on the LAN
    or internet.) The plan assumes yes.
+
+### Milestone 1 notes
+
+- **Card code.** `cogs_io.s` is a2chat's register layer, trimmed. `cogs.c`
+  sends one command and reads frames until its reply, skipping events and
+  unrelated replies; an `ERROR` with socket `$FF` means the card refused
+  the command. If a frame stops partway, it resets the card's parser and
+  both FIFOs (CONTROL `$08` then `$04`, never the soft reset).
+- **Host tests:** `make host-test` runs 46 checks against a model of the
+  card: every command, events and a socket `ERROR` queued ahead of a
+  reply, replies longer and shorter than expected, an unknown opcode, a
+  reply cut off partway, no reply at all, a stray byte, and the number and
+  date formatters against Python's `datetime`.
+- **The probe** is `PROBE.SYSTEM` on the same disk: quit newsiie with
+  `OA-Q` and pick it in the ProDOS selector. It scans the slots, resets
+  the card, PINGs, waits up to 20 s for a link, reads `STATUS`, `TIME`
+  and `LOCALTIME`, checks data both ways (eight 255-byte `RANDOM`
+  replies; SHA-256 of `"abc"` and of 1000 known bytes against digests
+  from Python's `hashlib`), and times 100 PINGs. One screen, meant to be
+  photographed.
+- **The app** finds the card while the splash is up and shows its address
+  (or `NO COGS CARD`, `JOINING`, `NO NETWORK`) on the status bar.
+- **Disk II safety:** a slot whose ROM is a Disk II's boot ROM is never
+  probed, since its `$C0nX` switches move the head. Verified in Virtual ][:
+  slot 6 is skipped and ProDOS keeps loading programs after both scans.
+- **Virtual ][ has no CoGS card,** so only the no-card path is tested in
+  the emulator.
+- **Real card, 2026-11-14: all checks passed.** Enhanced //e, card in
+  slot 5, firmware **1.42, protocol $05** (newer than the 1.39 / $04 the
+  reference describes; nothing here depends on either value). Wi-Fi link
+  up, 172.16.16.107, -53 dBm. 134K heap free, one socket already open
+  before we touched it. TIME synced from NTP, so verified https is
+  possible. LOCALTIME equals UTC: the card's timezone offset is 0.
+  RANDOM 8 x 255 and both SHA-256 digests correct. 100 PINGs in 15
+  frames, about 2.5 ms a round trip (each round trip is shorter than a
+  frame, so the once-per-PING tick poll cannot miss frames). The app's
+  status bar showed `COGS 172.16.16.107`.
+- **For milestone 2:** this machine boots from the CoGS network disk
+  (confirmed), so the rules in section 1 apply from the first fetch. The
+  open socket is not ours; `STREAM_OPEN` may also find the network stream
+  busy, so open should close handle 0 first. `fetchprobe` should run from
+  the network disk too, and report whether ProDOS still loads after a
+  stream has been opened, read and closed.
+- **Size:** NEWSIIE.SYSTEM 8.7K, PROBE.SYSTEM 10.8K. The app links all of
+  `cogs.c` and the 32-bit date code it does not use yet, since the linker
+  takes whole object files; worth splitting if space gets tight.
+- `vii.sh`: Virtual ][ has no `return` key name; `vii.sh ret` types `$0D`.
+

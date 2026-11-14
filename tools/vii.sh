@@ -8,7 +8,9 @@
 #   screen                the screen as text, blank lines stripped
 #   screen-raw            all 24 rows
 #   await <text> [secs]   wait for text to appear; exit 1 on timeout
-#   key <name>            up, down, left, right, escape, return, tab
+#   key <name>            "up arrow", "down arrow", "left arrow", "right
+#                         arrow", esc (quote two-word names)
+#   ret                   Return (not a key name Virtual ][ accepts)
 #   text <string>         type characters
 #   oa <char>             Open-Apple + character
 #   snap <file.png>       screenshot
@@ -76,7 +78,8 @@ await)
     "$0" screen >&2 || true
     exit 1
     ;;
-key)  as "tell (last machine) to type key $1" ;;
+key)  as "tell (last machine) to type key $*" ;;
+ret)  as 'tell (last machine) to type text (character id 13)' ;;
 text) as "tell (last machine) to type text \"$1\"" ;;
 oa)   as "tell (last machine) to type open Apple \"$1\"" ;;
 snap)
