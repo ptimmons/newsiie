@@ -25,6 +25,11 @@
 #define OP_LOCALTIME    0x0F
 #define OP_HASH         0x30
 #define OP_RANDOM       0x31
+#define OP_STREAM_OPEN  0x70
+#define OP_STREAM_READ  0x71
+#define OP_STREAM_CLOSE 0x72
+
+#define STREAM_NET      0       /* the network stream's handle */
 
 #define EV_ERROR        0x93
 #define SOCK_NONE       0xFF
@@ -34,6 +39,7 @@
 #define MAX_SKIPPED     64
 
 uint8_t cogs_slot;
+uint8_t (*cogs_idle)(void);
 
 static uint8_t hdr[3];
 
@@ -70,6 +76,7 @@ const char *cogs_strerror(uint8_t code)
     case COGS_E_TIMEOUT: return "CARD STOPPED ANSWERING";
     case COGS_E_PROTO:   return "CARD PROTOCOL ERROR";
     case COGS_E_NOCARD:  return "NO COGS CARD";
+    case COGS_E_ABORT:   return "STOPPED";
     }
     return "CARD ERROR";
 }
@@ -84,9 +91,15 @@ static uint32_t le32(const uint8_t *p)
     return (uint32_t)le16(p) | ((uint32_t)le16(p + 2) << 16);
 }
 
-/* Lost frame alignment: start again from a clean parser and empty FIFOs. */
-static uint8_t lost(void)
+uint8_t cogs_lost_why;
+uint8_t cogs_lost_op;
+
+/* Lost frame alignment: start again from a clean parser and empty FIFOs,
+ * and remember why, for the diagnostics. */
+static uint8_t lost(uint8_t why, uint8_t op)
 {
+    cogs_lost_why = why;
+    cogs_lost_op = op;
     cogs_resync();
     return COGS_E_TIMEOUT;
 }
@@ -136,14 +149,28 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
     if (cogs_putn(hdr, 3) ||
         (npre && cogs_putn(pre, npre)) ||
         (nbody && cogs_putn(body, nbody))) {
-        return lost();
+        return lost(COGS_LOST_SEND, op);
     }
 
     for (skipped = 0; skipped < MAX_SKIPPED; ++skipped) {
+        if (cogs_idle) {
+            while (!(cogs_status() & COGS_ST_RX_AVAIL)) {
+                rop = cogs_idle();
+                if (rop) {
+                    /* A reply may still come later. Flush what there is;
+                     * a late one is skipped by the next request, which
+                     * waits for its own opcode. */
+                    cogs_lost_why = COGS_LOST_IDLE;
+                    cogs_lost_op = op;
+                    cogs_resync();
+                    return rop;
+                }
+            }
+        }
         if (get_bytes(hdr, 3)) {
             /* Nothing at all, or a header cut short. Either way the card
              * is not where we think it is. */
-            return lost();
+            return lost(COGS_LOST_HEADER, op);
         }
         rop = hdr[0];
         len = le16(hdr + 1);
@@ -151,7 +178,7 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
         if (rop == (uint8_t)(op | 0x80)) {
             n = len < cap ? len : cap;
             if (get_bytes(buf, n) || (len > n && cogs_skip(len - n))) {
-                return lost();
+                return lost(COGS_LOST_PAYLOAD, rop);
             }
             if (got) {
                 *got = n;
@@ -161,7 +188,7 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
 
         if (rop == EV_ERROR && len >= 2) {
             if (get_bytes(err, 2) || cogs_skip(len - 2)) {
-                return lost();
+                return lost(COGS_LOST_PAYLOAD, rop);
             }
             if (err[0] == SOCK_NONE) {
                 /* The card refused the command we just sent. */
@@ -173,10 +200,10 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
         /* Every card-to-host opcode has bit 7 set. Anything else means we
          * are reading the middle of a frame. */
         if (!(rop & 0x80)) {
-            return lost();
+            return lost(COGS_LOST_OPCODE, rop);
         }
         if (len && cogs_skip(len)) {
-            return lost();
+            return lost(COGS_LOST_PAYLOAD, rop);
         }
     }
     return COGS_E_PROTO;
@@ -284,4 +311,67 @@ uint8_t cogs_sha256(const uint8_t *src, uint16_t n, uint8_t digest[32])
         return rc;
     }
     return got == 32 ? COGS_OK : COGS_E_PROTO;
+}
+
+/* Replies to the stream commands start handle, result. */
+static uint8_t stream_result(uint8_t rc, const uint8_t *r, uint16_t got)
+{
+    if (rc) {
+        return rc;
+    }
+    if (got < 2 || r[0] != STREAM_NET) {
+        return COGS_E_PROTO;
+    }
+    return r[1];
+}
+
+uint8_t cogs_stream_open(const char *url, uint8_t len)
+{
+    uint8_t r[2];
+    uint16_t got;
+    uint8_t rc = cogs_request(OP_STREAM_OPEN, &len, 1, (const uint8_t *)url, len,
+                              r, sizeof r, &got);
+
+    return stream_result(rc, r, got);
+}
+
+uint8_t cogs_stream_read(uint8_t *buf, uint16_t max, cogs_chunk_t *c)
+{
+    uint8_t pre[3];
+    uint16_t got;
+    uint8_t rc;
+
+    pre[0] = STREAM_NET;
+    pre[1] = (uint8_t)max;
+    pre[2] = (uint8_t)(max >> 8);
+    c->len = 0;
+    c->flags = 0;
+    c->data = buf + COGS_STREAM_HDR;
+    rc = cogs_request(OP_STREAM_READ, pre, 3, NULL, 0, buf,
+                      (uint16_t)(COGS_STREAM_HDR + max), &got);
+    rc = stream_result(rc, buf, got);
+    if (rc) {
+        return rc;
+    }
+    if (got < COGS_STREAM_HDR) {
+        return COGS_E_PROTO;
+    }
+    c->flags = buf[2];
+    c->level = buf[3];
+    c->len = le16(buf + 4);
+    /* A reply longer than we asked for was cut by cogs_request; that is
+     * data lost, not a short read. */
+    if (c->len > max || got != (uint16_t)(COGS_STREAM_HDR + c->len)) {
+        return COGS_E_PROTO;
+    }
+    return COGS_OK;
+}
+
+uint8_t cogs_stream_close(void)
+{
+    uint8_t r[2], h = STREAM_NET;
+    uint16_t got;
+    uint8_t rc = cogs_request(OP_STREAM_CLOSE, &h, 1, NULL, 0, r, sizeof r, &got);
+
+    return stream_result(rc, r, got);
 }

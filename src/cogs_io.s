@@ -61,23 +61,41 @@ _cogs_set_slot:
         rts
 
 ; unsigned char __fastcall__ cogs_probe(unsigned char slot)
-; 1 if ID reads $A2, VERSION is nonzero and STATUS is not $FF (an empty
-; slot's floating bus). Reads only those three registers, never DATA.
-; The caller must have ruled out a Disk II: its $C0nX switches move the head.
+; 1 if a CoGS card answers in the slot. Reads only ID, VERSION and STATUS,
+; never DATA. The caller must have ruled out a Disk II: its $C0nX switches
+; move the head.
+;
+; The reference's test is one read each: ID $A2, VERSION nonzero, STATUS
+; not $FF. On a //e that is not enough. An undecoded I/O address returns
+; the floating bus, the byte the video circuitry is fetching from screen
+; memory at that moment, and with the right text on screen it reads $A2:
+; Virtual ][ showed a CoGS in slot 2 that way. So ID must read $A2 32
+; times running, interleaved with VERSION, which must hold one value from
+; 1 to 15 (a register-map generation: $04 in the reference, $05 on 1.42).
+; About 25 cycles a pass, so the reads span many video fetches.
 _cogs_probe:
         asl
         asl
         asl
         asl
         tax
-        lda     REG_ID,x
+        lda     REG_VERSION,x
+        beq     @no
+        cmp     #$10
+        bcs     @no
+        sta     tmp1            ; the VERSION every pass must see
+        ldy     #32
+@pass:  lda     REG_ID,x
         cmp     #$A2
         bne     @no
         lda     REG_VERSION,x
-        beq     @no
+        cmp     tmp1
+        bne     @no
         lda     REG_STATUS,x
         cmp     #$FF
         beq     @no
+        dey
+        bne     @pass
         lda     #1
         ldx     #0
         rts

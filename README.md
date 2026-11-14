@@ -10,10 +10,14 @@ card and showing its address. Nothing is fetched yet.
 
 ## Checking a CoGS card
 
-The disk also carries `PROBE.SYSTEM`. Quit newsiie with `Open-Apple-Q`,
-choose `PROBE.SYSTEM` in the ProDOS selector, and it checks the card end to
-end on one screen: slot, firmware, network, clock, and data integrity in
-both directions.
+The disk also carries two test programs. Quit newsiie with `Open-Apple-Q`
+and choose one in the ProDOS selector.
+
+- `PROBE.SYSTEM` checks the card end to end on one screen: slot, firmware,
+  network, clock, and data integrity in both directions.
+- `FETCH.SYSTEM` downloads test feeds through the card's byte streams and
+  reports size, speed and content type, then checks that ProDOS can still
+  read the boot volume. Press `A` to run everything.
 
 ## Building
 

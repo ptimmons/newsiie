@@ -7,6 +7,7 @@
  * comes returns its timeout at once.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "cogs.h"
 #include "fmt.h"
@@ -32,15 +33,76 @@ static int status_len = 17;
 static uint8_t last_payload[4096];
 static unsigned last_len;
 
+/* The network stream. */
+static uint8_t  body[70000];
+static unsigned body_len, body_pos;
+static int      stream_open;
+static uint8_t  open_result;        /* what the next STREAM_OPEN answers */
+static int      open_delay;         /* idle calls before the open reply lands */
+static int      open_pending;
+static char     open_url[256];
+static int      read_toggle;        /* every other read finds the ring empty */
+static int      idle_calls, idle_limit;
+
+static void put(uint8_t op, const uint8_t *p, unsigned n);
+static void read_reply(unsigned max);
+static int      read_delay;         /* idle calls before a read reply lands */
+static unsigned read_pending;       /* max of a read waiting to be answered */
+static int      read_idle0;
+
 static void reset_model(void)
 {
     qh = qt = frn = 0;
     events_first = silent = truncate_reply = short_reply = garbage_first = 0;
     status_len = 17;
+    stream_open = open_pending = 0;
+    open_result = 0;
+    open_delay = 0;
+    read_toggle = 0;
+    idle_calls = 0;
+    idle_limit = 0;
+    read_delay = 0;
+    read_pending = 0;
+}
+
+static void open_reply(void)
+{
+    uint8_t r[2] = { 0, open_result };
+
+    stream_open = !open_result;
+    body_pos = 0;
+    put(0xF0, r, 2);
+}
+
+/* The idle hook cogs.c calls while a reply has not started. */
+static uint8_t idle(void)
+{
+    ++idle_calls;
+    if (open_pending && idle_calls >= open_delay) {
+        open_pending = 0;
+        open_reply();
+    }
+    if (read_pending && idle_calls - read_idle0 >= read_delay) {
+        read_reply(read_pending);
+        read_pending = 0;
+    }
+    if (idle_limit && idle_calls >= idle_limit) {
+        return COGS_E_TIMEOUT;
+    }
+    return 0;
 }
 
 static void put(uint8_t op, const uint8_t *p, unsigned n)
 {
+    /* The FIFO never wraps; rewind it whenever the host has drained it,
+     * which it always has by the time a new command arrives. */
+    if (qh == qt) {
+        qh = qt = 0;
+    }
+    if (qt + 3 + n > sizeof q) {
+        printf("model FIFO overflow\n");
+        exit(2);
+    }
     q[qt++] = op;
     q[qt++] = (uint8_t)n;
     q[qt++] = (uint8_t)(n >> 8);
@@ -49,6 +111,35 @@ static void put(uint8_t op, const uint8_t *p, unsigned n)
 }
 
 static uint8_t pat(unsigned i) { return (uint8_t)(i * 7 + 3); }
+
+/* The card's answer to STREAM_READ for up to max bytes. */
+static void read_reply(unsigned max)
+{
+    static uint8_t rr[6 + 4096];
+    unsigned n = 0;
+
+    rr[0] = 0;
+    rr[1] = 0;
+    if (!stream_open) {
+        rr[1] = 18;
+        memset(rr + 2, 0, 4);
+        put(0xF1, rr, 6);
+        return;
+    }
+    /* With read_toggle set, every other read finds the ring empty. */
+    if (!read_toggle || !(++read_toggle & 1)) {
+        n = body_len - body_pos;
+        if (n > max) n = max;
+    }
+    memcpy(rr + 6, body + body_pos, n);
+    body_pos += n;
+    rr[2] = body_pos < body_len ? 1 : 2;        /* FLOWING, or END */
+    if (!n && body_pos < body_len) rr[2] |= 4;  /* STALLED */
+    rr[3] = 128;
+    rr[4] = (uint8_t)n;
+    rr[5] = (uint8_t)(n >> 8);
+    put(0xF1, rr, 6 + n);
+}
 
 static void card_frame(void)
 {
@@ -111,6 +202,29 @@ static void card_frame(void)
         for (i = 0; i < p[0]; ++i) r[i] = pat(i);
         put(0xB1, r, p[0]);
         break;
+    case 0x70:                              /* STREAM_OPEN, deferred */
+        memcpy(open_url, p + 1, p[0]);
+        open_url[p[0]] = 0;
+        if (open_delay) {
+            open_pending = 1;
+        } else {
+            open_reply();
+        }
+        break;
+    case 0x71:                              /* STREAM_READ */
+        if (read_delay) {
+            read_pending = p[1] | (p[2] << 8);
+            read_idle0 = idle_calls;
+        } else {
+            read_reply(p[1] | (p[2] << 8));
+        }
+        break;
+    case 0x72: {                            /* STREAM_CLOSE */
+        uint8_t cr[2] = { 0, (uint8_t)(stream_open ? 0 : 18) };
+        stream_open = 0;
+        put(0xF2, cr, 2);
+        break;
+    }
     default: {                              /* UNSUPPORTED, from the parser */
         uint8_t e[8] = { 0xFF, 11, 5, 'n', 'o', 'p', 'e', '!' };
         put(0x93, e, sizeof e);
@@ -222,18 +336,21 @@ static void test_events_and_errors(void)
     nresync = 0;
     truncate_reply = 1;
     CHECK(cogs_ping(&p) == COGS_E_TIMEOUT && nresync == 1);
+    CHECK(cogs_lost_why == COGS_LOST_PAYLOAD && cogs_lost_op == 0x80);
 
     /* No reply at all. */
     reset_model();
     nresync = 0;
     silent = 1;
     CHECK(cogs_ping(&p) == COGS_E_TIMEOUT && nresync == 1);
+    CHECK(cogs_lost_why == COGS_LOST_HEADER && cogs_lost_op == 0x00);
 
     /* A stray byte that cannot start a card frame. */
     reset_model();
     nresync = 0;
     garbage_first = 1;
     CHECK(cogs_ping(&p) == COGS_E_TIMEOUT && nresync == 1);
+    CHECK(cogs_lost_why == COGS_LOST_OPCODE && cogs_lost_op == 0x42);
 
     /* A complete reply that is too short to parse. */
     reset_model();
@@ -244,6 +361,106 @@ static void test_events_and_errors(void)
     CHECK(!strcmp(cogs_strerror(20), "ALREADY MOUNTED"));
     CHECK(!strcmp(cogs_strerror(COGS_E_TIMEOUT), "CARD STOPPED ANSWERING"));
     CHECK(!strcmp(cogs_strerror(99), "CARD ERROR"));
+}
+
+static void test_streams(void)
+{
+    static uint8_t buf[6 + 4096], got[70000];
+    const char *url = "https://hnrss.org/frontpage";
+    cogs_chunk_t c;
+    unsigned i, total, reads, empties;
+    uint8_t rc;
+
+    reset_model();
+    body_len = 65000;
+    for (i = 0; i < body_len; ++i) body[i] = pat(i);
+
+    /* The open reply comes only after the card has done its network work:
+     * cogs.c must wait through the idle hook, not the byte timeout. */
+    cogs_idle = idle;
+    open_delay = 5;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == 0);
+    CHECK(!strcmp(open_url, url) && idle_calls >= 5 && stream_open);
+
+    /* Read the whole body in 512-byte chunks, with the ring found empty on
+     * every other read, until END. */
+    read_toggle = 1;
+    total = reads = empties = 0;
+    for (;;) {
+        rc = cogs_stream_read(buf, 512, &c);
+        CHECK(rc == 0);
+        if (rc) break;
+        CHECK(c.len <= 512 && c.data == buf + 6);
+        if (!c.len) {
+            ++empties;
+            if (c.flags & COGS_SF_END) break;
+            CHECK(c.flags & COGS_SF_STALLED);
+            continue;
+        }
+        memcpy(got + total, c.data, c.len);
+        total += c.len;
+        ++reads;
+        if (c.flags & COGS_SF_END) break;
+        if (reads > 1000) break;
+    }
+    CHECK(total == body_len && !memcmp(got, body, body_len));
+    CHECK(reads == (body_len + 511) / 512 && empties > 0);
+    CHECK(qh == qt);
+
+    /* Bigger reads, up to the card's 4096 cap. */
+    CHECK(cogs_stream_close() == 0 && !stream_open);
+    read_toggle = 0;
+    open_delay = 0;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == 0);
+    total = 0;
+    do {
+        CHECK(cogs_stream_read(buf, 4096, &c) == 0);
+        total += c.len;
+    } while (!(c.flags & COGS_SF_END) && c.len);
+    CHECK(total == body_len && qh == qt);
+
+    /* Closing again: no stream open. */
+    CHECK(cogs_stream_close() == 0);
+    CHECK(cogs_stream_close() == COGS_E_STREAM_NONE);
+    CHECK(cogs_stream_read(buf, 512, &c) == COGS_E_STREAM_NONE && c.len == 0);
+
+    /* A 404: the open is refused, nothing is open. */
+    open_result = COGS_E_REFUSED;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == COGS_E_REFUSED && !stream_open);
+    open_result = 0;
+
+    /* A read the card holds back until the server answers (seen on a real
+     * card with slow servers): the idle hook covers reads too. */
+    reset_model();
+    cogs_idle = idle;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == 0);
+    read_delay = 40;
+    CHECK(cogs_stream_read(buf, 512, &c) == 0 && c.len == 512);
+    CHECK(idle_calls >= 40 && !memcmp(c.data, body, 512));
+    read_delay = 0;
+    CHECK(cogs_stream_close() == 0);
+
+    /* Without the hook, the same read gives up at the byte timeout. */
+    cogs_idle = NULL;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == 0);
+    read_delay = 40;
+    cogs_lost_why = 0;
+    CHECK(cogs_stream_read(buf, 512, &c) == COGS_E_TIMEOUT);
+    CHECK(cogs_lost_why == COGS_LOST_HEADER && cogs_lost_op == 0x71);
+    cogs_idle = idle;
+
+    /* An open the card never answers: the idle hook gives up, and the
+     * FIFOs are flushed so a late reply cannot be mistaken for the next. */
+    reset_model();
+    cogs_idle = idle;
+    silent = 1;
+    idle_limit = 50;
+    nresync = 0;
+    CHECK(cogs_stream_open(url, (uint8_t)strlen(url)) == COGS_E_TIMEOUT);
+    CHECK(idle_calls == 50 && nresync == 1);
+    CHECK(cogs_lost_why == COGS_LOST_IDLE && cogs_lost_op == 0x70);
+
+    cogs_idle = NULL;
 }
 
 static void test_fmt(void)
@@ -281,6 +498,7 @@ int main(void)
 {
     test_commands();
     test_events_and_errors();
+    test_streams();
     test_fmt();
     if (fails) {
         printf("%d of %d checks FAILED\n", fails, checks);

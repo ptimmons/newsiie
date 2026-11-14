@@ -6,8 +6,8 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestones 0 and 1 are done, and milestone 1 is verified on a
-real card (see section 9).
+**Status:** milestones 0, 1 and 2 are done and verified on a real card
+(see section 9). Next is milestone 3, the feed parser.
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -212,7 +212,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 |---|---|---|
 | 0 ✅ | Repo scaffold, Makefile, linker config, screen primitives, splash, empty Feeds view, status bar, help box, bootable disk | Virtual ][ (splash, Feeds, help, OA-Q to ProDOS) |
 | 1 ✅ | `cogs_io.s` + `cogs.c` with host model tests; `PROBE.SYSTEM`: find the card, PING, wait for link, show firmware, IP, time, data integrity both ways | host tests ✅, Virtual ][ no-card path ✅, **real card ✅** |
-| 2 | `fetchprobe` disk: `STREAM_OPEN` a URL, dump bytes to the screen, report size, KB/s, and result codes for http, https, a redirecting URL, a 404 | **your card** — settles the risks below |
+| 2 ✅ | `FETCH.SYSTEM`: stream a URL to the end and report bytes, KB/s at four read sizes, content type (XML / gzip / HTML), and result codes for http, https, a redirect, a 404; then read the boot volume through ProDOS | host tests ✅, Virtual ][ menu and disk check ✅, **real card ✅** — settled the risks below |
 | 3 | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests, Virtual ][ |
 | 4 | Item store in aux; Headlines screen with scrolling | suite |
 | 5 | Article screen: cleaning, UTF-8 folding, word wrap, paging | suite |
@@ -314,4 +314,78 @@ Milestones 1–2 and 3 are independent and could run in parallel.
   `cogs.c` and the 32-bit date code it does not use yet, since the linker
   takes whole object files; worth splitting if space gets tight.
 - `vii.sh`: Virtual ][ has no `return` key name; `vii.sh ret` types `$0D`.
+
+### Milestone 2 notes
+
+- **Stream commands** in `cogs.c`: `cogs_stream_open`, `_read`, `_close`.
+  `STREAM_OPEN` is deferred (DNS, TLS and the response header come first),
+  so `cogs_request` now calls a caller-supplied `cogs_idle` hook while no
+  reply has started; the hook keeps the clock and can give up, and giving
+  up flushes the FIFOs so a late reply cannot be read as the next one.
+- **Host tests** add streams: a deferred open, a 65,000-byte body read to
+  the end in 512- and 4096-byte reads with the ring found empty on every
+  other read, closing twice, reading with no stream, a 404, and an open the
+  card never answers.
+- **`FETCH.SYSTEM`** is on the disk beside the probe. Tests, chosen after
+  checking each from the Mac with `Accept-Encoding: identity`:
+  1. http, no redirect: `http://rss.cnn.com/rss/edition.rss` (~130K)
+  2. https: `https://hnrss.org/frontpage` (~18K)
+  3. redirect: `http://hnrss.org/frontpage` (301 to https)
+  4. 404: `https://httpbin.org/status/404` (passes if refused)
+  5. 75K: `https://feeds.arstechnica.com/arstechnica/index`
+  6. 250K: `https://www.nasa.gov/feed/`
+
+  `U` takes any URL, `C` cycles the read size (512 to 4096), `A` runs all
+  six, and every fetch ends with a ProDOS `READ_BLOCK` of the boot volume's
+  directory, done only after the stream is closed (section 1, rule 1).
+- **Timing** comes from the card's uptime in `STATUS`, in whole seconds.
+  The vertical-blank counter cannot time transfers: a 512-byte read takes
+  about 12 ms with no chance to poll, long enough to miss a blank.
+- The fetch loop keeps nothing but the first 480 bytes, so its rate is the
+  transfer rate alone, before any parsing.
+- **First run on the real card (2026-11-14, firmware 1.42, booted from the
+  network disk), reads of 512:** http (CNN) OK 127K; https (Hacker News)
+  OK 17K; **redirect http to https OK 17K**, so streams follow redirects;
+  Ars Technica OK 74K. The 404 and NASA both failed the same way: the open
+  succeeded, then the first `STREAM_READ` lost its reply header. The disk
+  check read `/NEWSIIE` (unit `$50`, slot 5) after every fetch, so streams
+  and the network disk coexist, even after a parser reset.
+- **Fix 1, patient reads.** Only the open had the long wait; reads relied
+  on the primitives' ~1 s byte wait. The card evidently holds the first
+  read's reply until the server answers, and httpbin and nasa.gov answer
+  slowly. Every stream command now waits through `cogs_idle` (60 s cap,
+  seconds shown on the status bar). Host tests reproduce both behaviours.
+  `cogs_lost_why` / `cogs_lost_op` now say how a frame was lost, and FETCH
+  prints that, the failing read's number, and the longest single wait.
+- **Fix 2, card detection.** In Virtual ][, FETCH reported a CoGS in slot 2.
+  An undecoded I/O address returns the floating bus (screen memory as the
+  video scanner reads it), which can read `$A2`. `cogs_probe` now needs ID
+  `$A2` 32 times running with VERSION steady at 1..15; three boots since
+  found no card, as they should. Real hardware can float the same way, so
+  this matters beyond the emulator.
+- A 404 that the card lets through (open succeeds) now shows as
+  `NOT REFUSED` rather than OK.
+- **Second run on the real card, after both fixes: all six pass.** CNN
+  127K, Hacker News 17K over https and 17K through the redirect, the 404
+  refused at open as the reference says, Ars Technica 74K, and NASA
+  252,742 bytes, exactly the size curl gets on the Mac. The disk check read
+  `/NEWSIIE` after each. NASA, at reads of 512: 13 s, **18.9 KB/s**, 494
+  reads with data and **none empty, ring peak 255/255**, longest single
+  wait 1 s. The card's ring stayed full throughout, so the Apple's read
+  loop, not the network, sets the pace. Content: plain XML (RSS 2.0).
+- Not explained: on the first run the 404's open succeeded and its first
+  read failed; on the second it was refused at open. The fixes changed
+  only the waiting, so the card or httpbin may have answered differently.
+  newsiie handles both.
+
+### Risks settled by milestone 2
+
+- **Redirects:** streams follow them (http to https, 301).
+- **Compression:** none seen; every body arrived as plain XML.
+- **TLS:** works, with the card's NTP clock set.
+- **404 and other non-2xx:** refused at open (`CONN_REFUSED`, 4).
+- **Speed:** 18.9 KB/s raw at 512-byte reads, limited by the Apple. The
+  parser will set the real rate; 512 is enough for now, and larger reads or
+  a BULK burst read are the first levers if transfer ever dominates.
+- **Network disk:** streams and ProDOS block reads alternate cleanly.
 

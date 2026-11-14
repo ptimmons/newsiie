@@ -1,7 +1,7 @@
 # newsiie -- an RSS reader for the Enhanced Apple //e with a CoGS card.
 #
-#   make            build build/NEWSIIE.SYSTEM and build/PROBE.SYSTEM
-#   make disk       the bootable ProDOS image build/NEWSIIE.po, carrying both
+#   make            build NEWSIIE.SYSTEM and the two probes, PROBE and FETCH
+#   make disk       the bootable ProDOS image build/NEWSIIE.po, carrying all three
 #   make run        build, boot it in Virtual ][, print the screen
 #   make host-test  the C that has no Apple dependencies, run on the Mac
 #   make clean
@@ -34,11 +34,16 @@ APP = \
 PROBE = \
 	src/probe.c
 
+FETCH = \
+	src/fetch.c \
+	src/disk.s
+
 obj = $(patsubst src/%.s,build/%.o,$(patsubst src/%.c,build/%.o,$(1)))
 HDRS = $(wildcard src/*.h)
 
 BIN   = build/NEWSIIE.SYSTEM
 PRBIN = build/PROBE.SYSTEM
+FTBIN = build/FETCH.SYSTEM
 DISK  = build/NEWSIIE.po
 
 HOST_CC     = cc
@@ -46,7 +51,7 @@ HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
 .PHONY: all disk run host-test clean
 
-all: $(BIN) $(PRBIN)
+all: $(BIN) $(PRBIN) $(FTBIN)
 
 build build/host:
 	mkdir -p $@
@@ -65,12 +70,16 @@ $(PRBIN): $(call obj,$(PROBE) $(COMMON)) $(CFG)
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/probe.map -Ln build/probe.lbl -o $@ $(call obj,$(PROBE) $(COMMON))
 	@echo "PROBE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
 
+$(FTBIN): $(call obj,$(FETCH) $(COMMON)) $(CFG)
+	$(CL65) -t $(TARGET) -C $(CFG) -m build/fetch.map -Ln build/fetch.lbl -o $@ $(call obj,$(FETCH) $(COMMON))
+	@echo "FETCH.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
+
 disk: $(DISK)
 
 # NEWSIIE.SYSTEM goes first, so it is the one ProDOS launches at boot.
-# PROBE.SYSTEM is launched from the quit selector.
-$(DISK): $(BIN) $(PRBIN) tools/mkdisk.sh
-	tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN)
+# The probes are launched from the quit selector.
+$(DISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh
+	tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN) $(FTBIN)
 
 run: $(DISK)
 	tools/vii.sh boot $(DISK)
