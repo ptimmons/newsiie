@@ -46,7 +46,11 @@ int main(void)
     key_get();                  /* consumed: it must not act on the view */
 
     while (view != V_QUIT) {
-        view = view == V_FEEDS ? feeds_run() : heads_run();
+        switch (view) {
+        case V_FEEDS:   view = feeds_run();   break;
+        case V_HEADS:   view = heads_run();   break;
+        default:        view = article_run(); break;
+        }
     }
 
     scr_done();

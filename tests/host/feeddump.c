@@ -21,13 +21,16 @@ static uint8_t sink(const feed_item_t *it)
     printf("  link:  %s\n", it->link);
     printf("  date:  %s\n", it->date);
     printf("  guid:  %s\n", it->guid);
-    while (*b) {
-        e = strchr(b, '\n');
-        if (!e) {
-            e = b + strlen(b);
+    /* "| " starts a paragraph, ": " a line inside one (an HTML <br>). */
+    {
+        char mark = '|';
+
+        while (*b) {
+            e = b + strcspn(b, "\n\r");
+            printf("  %c %.*s\n", mark, (int)(e - b), b);
+            mark = *e == '\r' ? ':' : '|';
+            b = *e ? e + 1 : e;
         }
-        printf("  | %.*s\n", (int)(e - b), b);
-        b = *e ? e + 1 : e;
     }
     return (uint8_t)(max_items && feed_items >= max_items);
 }

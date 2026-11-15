@@ -47,6 +47,8 @@ APP = \
 	src/net.c \
 	src/ui.c \
 	src/heads.c \
+	src/article.c \
+	src/wrap.c \
 	src/store.c \
 	src/source.c \
 	src/auxmem.s \
@@ -127,7 +129,7 @@ $(TDISK): $(TBIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh
 # Four corpus feeds on a 140K disk named /FEEDS, for drive 2.
 feedsdisk: build/FEEDS.po
 
-build/FEEDS.po: tools/mkfeeds.sh
+build/FEEDS.po: tools/mkfeeds.sh tests/fixtures/caps.xml tests/fixtures/rss2.xml
 	@[ -d build/corpus ] || tools/getcorpus.sh
 	tools/mkfeeds.sh $@
 
@@ -154,10 +156,14 @@ FIXTURES = $(wildcard tests/fixtures/*.xml)
 build/host/test_store: tests/host/test_store.c src/store.c $(HDRS) | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_store.c src/store.c
 
-host-test: build/host/test_cogs build/host/test_clean build/host/test_store build/host/feeddump
+build/host/test_wrap: tests/host/test_wrap.c src/wrap.c $(HDRS) | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_wrap.c src/wrap.c
+
+host-test: build/host/test_cogs build/host/test_clean build/host/test_store build/host/test_wrap build/host/feeddump
 	build/host/test_cogs
 	build/host/test_clean
 	build/host/test_store
+	build/host/test_wrap
 	@fail=0; for f in $(FIXTURES); do \
 	    for c in 1 7 512; do \
 	        if ! build/host/feeddump -c $$c $$f | diff -u $${f%.xml}.out - ; then \

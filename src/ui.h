@@ -11,11 +11,13 @@
 
 #define V_FEEDS     0
 #define V_HEADS     1
-#define V_QUIT      2
+#define V_ARTICLE   2
+#define V_QUIT      3
 
 void splash_show(void);         /* draws the splash; caller waits for a key */
 uint8_t feeds_run(void);
 uint8_t heads_run(void);
+uint8_t article_run(void);
 void help_show(void);           /* draws the help box over the body rows */
 
 /* Rows 0 and 1: a heading at the left, a note at the right, and a rule. */
@@ -27,9 +29,13 @@ void ui_heading(const char *left, const char *right);
 #define UI_QUIT     2
 uint8_t ui_common(uint8_t k);
 
-/* The feed being read, set by the Feeds view. */
+/* The feed being read, set by the Feeds view, and the item open in the
+ * Article view (kept when it returns, so Headlines can follow Left and
+ * Right). heads_fresh tells Headlines a new fetch replaced its items. */
 extern const char *cur_name;
 extern const char *cur_url;
+extern uint16_t    cur_item;
+extern uint8_t     heads_fresh;
 
 /* The status bar. status_main() is the resting state for a view: a left
  * field, a middle field, the card's address, and the help hint at the

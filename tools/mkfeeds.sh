@@ -1,6 +1,6 @@
 #!/bin/bash
 # mkfeeds.sh <image.po> -- a 140K ProDOS disk named /FEEDS holding four
-# corpus feeds, for the test build's disk entries. Built from build/corpus,
+# corpus feeds and two fixtures, for the test build's disk entries. Built from build/corpus,
 # which tools/getcorpus.sh fills; the feeds are not ours, so neither the
 # corpus nor this disk is committed.
 set -euo pipefail
@@ -21,4 +21,8 @@ for f in hn ars bbc xkcd; do
     # -p, not -ptx: the bytes go on unchanged.
     "$AC" -p "$OUT" "$(echo "$f" | tr a-z A-Z).XML" TXT < "$ROOT/build/corpus/$f.xml"
 done
+# Two hand-written fixtures too: a 2000-character body (scrolling) and
+# paragraphs with a list (spacing).
+"$AC" -p "$OUT" CAPS.XML TXT < "$ROOT/tests/fixtures/caps.xml"
+"$AC" -p "$OUT" RSS2.XML TXT < "$ROOT/tests/fixtures/rss2.xml"
 "$AC" -l "$OUT"

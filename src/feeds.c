@@ -29,6 +29,8 @@ static const struct feed_def feeds[] = {
     { "Ars Technica (disk)", "/FEEDS/ARS.XML" },
     { "BBC News (disk)",     "/FEEDS/BBC.XML" },
     { "xkcd (disk)",         "/FEEDS/XKCD.XML" },
+    { "Long body (disk)",    "/FEEDS/CAPS.XML" },
+    { "Formatting (disk)",   "/FEEDS/RSS2.XML" },
     { "Not there (disk)",    "/FEEDS/NONE.XML" },
 #endif
     { "Hacker News",         "https://hnrss.org/frontpage" },
@@ -101,6 +103,7 @@ uint8_t feeds_run(void)
             rc = source_fetch(cur_url);
             if (store_count) {
                 /* Stopped or not, what arrived can be read. */
+                heads_fresh = 1;
                 return V_HEADS;
             }
             status_msg(source_error(rc));

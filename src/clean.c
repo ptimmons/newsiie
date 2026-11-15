@@ -166,13 +166,14 @@ static uint16_t html_entity(const char *s, uint16_t n, uint8_t *len)
 /* ---- HTML tags ---- */
 
 #define T_INLINE    0   /* <a>, <span>, <b>: nothing */
-#define T_BREAK     1   /* <p>, <br>, <div>, ...: a line break */
+#define T_BREAK     1   /* <p>, <div>, ...: a paragraph break */
 #define T_ITEM      2   /* <li>: a break and "- " */
 #define T_SPACE     3   /* <td>, <th>: a space */
 #define T_SKIP      4   /* <script>, <style>: drop everything to the close */
+#define T_LINE      5   /* <br>: a new line inside the paragraph */
 
 static const char *const breaks[] = {
-    "p", "br", "div", "tr", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6",
+    "p", "div", "tr", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6",
     "blockquote", "figure", "figcaption", "table", "section", "article",
     "header", "footer", "pre", "hr", "dd", "dt", "dl"
 };
@@ -184,6 +185,9 @@ static uint8_t tag_kind(const char *name, uint8_t closing)
 
     if (!strcmp(name, "li")) {
         return closing ? T_BREAK : T_ITEM;
+    }
+    if (!strcmp(name, "br")) {
+        return T_LINE;
     }
     if (!strcmp(name, "td") || !strcmp(name, "th")) {
         return T_SPACE;
@@ -221,14 +225,22 @@ static uint16_t find_close(const char *s, uint16_t n, const char *name)
 
 static char    *out;
 static uint16_t olen, ocap;
-static uint8_t  pend;           /* 0 nothing, 1 space, 2 line break */
+/* What separates the next text from the last: the strongest one asked
+ * for wins. In CLEAN_BODY a line break is '\r' and a paragraph break '\n';
+ * in CLEAN_LINE both are a space. */
+#define P_NONE      0
+#define P_SPACE     1
+#define P_LINE      2
+#define P_PARA      3
+static uint8_t  pend;
 static uint8_t  cmode;
 
 static void emit_sep(void)
 {
     if (pend && olen) {
         if (olen + 1 < ocap) {
-            out[olen++] = pend == 2 && cmode == CLEAN_BODY ? '\n' : ' ';
+            out[olen++] = cmode != CLEAN_BODY || pend == P_SPACE ? ' '
+                        : pend == P_LINE ? '\r' : '\n';
         }
     }
     pend = 0;
@@ -260,9 +272,11 @@ static void emit_cp(uint16_t cp)
     emit(clean_fold(cp));
 }
 
-static void brk(void)
+static void brk(uint8_t level)
 {
-    pend = 2;
+    if (pend < level) {
+        pend = level;
+    }
 }
 
 uint16_t clean(char *dst, uint16_t cap, const char *src, uint16_t n, uint8_t mode)
@@ -324,9 +338,11 @@ uint16_t clean(char *dst, uint16_t cap, const char *src, uint16_t n, uint8_t mod
                 gt = memchr(src + i, '>', n - i);
                 i = gt ? (uint16_t)(gt - src + 1) : n;
             } else if (kind == T_BREAK) {
-                brk();
+                brk(P_PARA);
+            } else if (kind == T_LINE) {
+                brk(P_LINE);
             } else if (kind == T_ITEM) {
-                brk();
+                brk(P_PARA);
                 if (mode == CLEAN_BODY) {
                     emit("-");
                     pend = 1;

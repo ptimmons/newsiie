@@ -45,6 +45,11 @@ extern char     feed_title[FEED_TITLE_MAX + 1];
 extern uint16_t feed_items;         /* items handed to the sink */
 extern uint8_t (*feed_sink)(const feed_item_t *it);
 
+/* The parser's 3K raw-body buffer, free to borrow whenever no feed is
+ * being parsed: the Article view keeps an item's text and link there. */
+#define FEED_SCRATCH_SIZE   3073
+extern char *const feed_scratch;
+
 void feed_begin(void);
 void feed_chunk(const uint8_t *p, uint16_t n);
 uint8_t feed_end(void);             /* returns feed_kind */

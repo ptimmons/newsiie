@@ -61,6 +61,15 @@ uint8_t lb_text(uint8_t col, const char *s, uint8_t inverse)
     return col;
 }
 
+/* As lb_text, for n bytes that need not end in a NUL. */
+uint8_t lb_textn(uint8_t col, const char *s, uint8_t n, uint8_t inverse)
+{
+    while (n-- && col < SCR_COLS) {
+        linebuf[col++] = sc_char(*s++, inverse);
+    }
+    return col;
+}
+
 uint8_t txt_len(const char *s)
 {
     return (uint8_t)strlen(s);

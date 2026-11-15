@@ -14,7 +14,8 @@
 #include "port.h"
 
 #define CLEAN_LINE  0   /* one line: every break becomes a space */
-#define CLEAN_BODY  1   /* paragraphs: block tags become '\n', <li> "- " */
+#define CLEAN_BODY  1   /* block tags become '\n' (a paragraph), <br> '\r'
+                         * (a line inside one), <li> "- " */
 
 /* Clean n bytes of src into dst (at most cap - 1 bytes, NUL-terminated).
  * src and dst must not overlap. Returns the length written. */

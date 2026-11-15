@@ -8,7 +8,7 @@ ITEM
   | - one
   | - two
   | Line
-  | break. Emoji ? and Lodz.
+  : break. Emoji ? and Lodz.
 ITEM
   title: Escaped HTML title
   link:  https://example.com/b

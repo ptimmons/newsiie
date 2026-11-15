@@ -28,6 +28,8 @@ uint8_t (*feed_sink)(const feed_item_t *it);
 #pragma bss-name (push, "LOWBSS")
 #endif
 static char raw_body[RAW_BODY + 1];
+/* Lent out between fetches (see feed.h). */
+char *const feed_scratch = raw_body;
 static char out_body[FEED_BODY_MAX + 1];
 static char raw_link[RAW_LINK + 1];
 static char raw_title[RAW_TITLE + 1];

@@ -43,6 +43,7 @@ uint8_t __fastcall__ sc_char(char c, uint8_t inverse);
 void __fastcall__ lb_clear(uint8_t code);
 void __fastcall__ lb_fill(uint8_t col, uint8_t n, uint8_t code);
 uint8_t lb_text(uint8_t col, const char *s, uint8_t inverse);
+uint8_t lb_textn(uint8_t col, const char *s, uint8_t n, uint8_t inverse);
 uint8_t lb_center(const char *s, uint8_t inverse);
 uint8_t txt_len(const char *s);
 void scr_clear(uint8_t from, uint8_t to);

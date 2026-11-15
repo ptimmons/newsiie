@@ -66,7 +66,10 @@ int main(void)
     CHECK_STR(line(""), "");
     CHECK_STR(line("   "), "");
     CHECK_STR(body("<p>a</p>\n\n<p>b</p>"), "a\nb");
-    CHECK_STR(body("<p></p><p></p>x<br><br>y<p>"), "x\ny");
+    CHECK_STR(body("<p></p><p></p>x<br><br>y<p>"), "x\ry");
+    CHECK_STR(body("a<br>b<p>c"), "a\rb\nc");
+    CHECK_STR(body("a<br><p>b"), "a\nb");          /* the paragraph wins */
+    CHECK_STR(line("a<br>b"), "a b");
     CHECK_STR(line("<p>a</p><p>b</p>"), "a b");
 
     /* tags */

@@ -24,6 +24,7 @@
 #define TITLE_COL   14
 
 static uint16_t top, sel;
+uint8_t heads_fresh;
 static store_head_t h;
 static char note[40];
 static char where[24];
@@ -98,10 +99,20 @@ uint8_t heads_run(void)
 {
     uint8_t k, rc;
 
-    top = sel = 0;
-    draw();
-    if (source_rc) {
-        status_msg(source_error(source_rc));
+    if (heads_fresh) {
+        heads_fresh = 0;
+        top = sel = 0;
+        draw();
+        if (source_rc) {
+            status_msg(source_error(source_rc));
+        }
+    } else {
+        /* Back from an article, maybe a different one (Left, Right). */
+        sel = cur_item;
+        if (sel < top || sel >= top + NROWS) {
+            top = sel >= NROWS / 2 ? (uint16_t)(sel - NROWS / 2) : 0;
+        }
+        draw();
     }
     for (;;) {
         k = key_get();
@@ -114,6 +125,10 @@ uint8_t heads_run(void)
         }
         if (k == K_ESC) {
             return V_FEEDS;
+        }
+        if (k == K_RETURN) {
+            cur_item = sel;
+            return V_ARTICLE;
         }
         if (k == K_UP) {
             if (key_oa) {

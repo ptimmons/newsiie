@@ -228,8 +228,8 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 1 ✅ | `cogs_io.s` + `cogs.c` with host model tests; `PROBE.SYSTEM`: find the card, PING, wait for link, show firmware, IP, time, data integrity both ways | host tests ✅, Virtual ][ no-card path ✅, **real card ✅** |
 | 2 ✅ | `FETCH.SYSTEM`: stream a URL to the end and report bytes, KB/s at four read sizes, content type (XML / gzip / HTML), and result codes for http, https, a redirect, a 404; then read the boot volume through ProDOS | host tests ✅, Virtual ][ menu and disk check ✅, **real card ✅** — settled the risks below |
 | 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
-| 4 (built) | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, **real card: pending** |
-| 5 | Article screen: cleaning, UTF-8 folding, word wrap, paging | suite |
+| 4 ✅ | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, real card ✅ |
+| 5 ✅ | Article screen: cleaning, UTF-8 folding, word wrap, paging | host tests ✅, Virtual ][ ✅, real card ✅ |
 | 6 | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | suite |
 | 7 | Live fetch wired in: progress, abort, error messages, refresh | **your card** |
 | 8 | Read markers, save article, README and manual, release image | suite + card |
@@ -494,3 +494,20 @@ Milestones 1–2 and 3 are independent and could run in parallel.
 - **Memory:** the app is 30K loaded; BSS ends at `$A1BF`, leaving about 5K
   of heap below the stack. Fits, with room for milestone 5, not much more.
 
+
+### Milestone 5 notes
+
+- **Article view** (`article.c`, `wrap.c`): title, date, link (cut at 78
+  with `>`), a rule, then the summary word-wrapped to 78 columns, a blank
+  line between paragraphs, none between list items or after an HTML
+  `<br>` (the cleaner now emits `\r` for `<br>`, `\n` for paragraphs).
+  Up/Down scroll, Space and Open-Apple-arrows page, Open-Apple-`<` `>` to
+  the ends, Left/Right to the previous and next item, Esc back to
+  Headlines on the item last read. Text and link borrow the parser's idle
+  3K buffer (`feed_scratch`).
+- **Tests:** 113 wrap checks on the Mac; in Virtual ][ a 2,000-character
+  body pages to `LINE 33 OF 33`, and the formatting fixture shows
+  paragraphs, a list, a `<br>` and folded Unicode correctly.
+- **Memory:** the app is 32K; BSS ends at `$AE8A`, about 2K below the
+  stack. Milestone 6 (the feeds file) will need the levers in section 5.
+- **Real card:** milestones 4 and 5 run on the user's //e (2026-11-14).
