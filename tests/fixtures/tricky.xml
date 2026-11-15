@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE rss [
+  <!ENTITY custom "value with > inside">
+]>
+<rss version="2.0"><channel><title>Tricky</title>
+<item>
+  <title><![CDATA[Brackets ]] and ]]]> done]]></title>
+  <link>https://example.com/t</link>
+  <description data-x='has > and " inside' other="ok">Unknown &nbsp;entity, stray & ampersand, &#x41;&#66;C, &bogus; stays.</description>
+  <guid/>
+</item>
+<item><title>Self-closing <br/> in a title?</title><link>https://example.com/u</link><description/></item>
+</channel></rss>

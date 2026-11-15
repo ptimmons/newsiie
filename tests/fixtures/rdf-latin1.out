@@ -1,0 +1,14 @@
+ITEM
+  title: Cafe creme (c) 1/2 price
+  link:  https://example.net/1
+  date:  2026-11-14 22:37
+  guid:  https://example.net/1
+  | Smorrebrod & ss.
+ITEM
+  title: Second
+  link:  https://example.net/2
+  date:  
+  guid:  https://example.net/2
+KIND rdf
+FEED Latin-1 Feed
+ITEMS 2

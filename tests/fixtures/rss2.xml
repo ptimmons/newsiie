@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A hand-written RSS 2.0 feed covering what newsiie must handle. -->
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+  <title>Caf&#233; &amp; Friends &#8212; News</title>
+  <link>https://example.com/</link>
+  <description>A test feed</description>
+  <image><title>Not the feed title</title><url>https://example.com/logo.png</url></image>
+  <item>
+    <title>It&#8217;s “quoted” — and naïve</title>
+    <link>https://example.com/a?x=1&amp;y=2</link>
+    <pubDate>Fri, 13 Nov 26 16:39:33 +0000</pubDate>
+    <guid isPermaLink="false">tag:example.com,2026:a</guid>
+    <source url="https://other.example/"><title>Wrong title</title></source>
+    <media:title>Also wrong</media:title>
+    <description><![CDATA[<p>First paragraph with <b>bold</b> and a <a href="x">link</a>.</p><p>Second&nbsp;one &rsquo;s here&hellip;</p><ul><li>one</li><li>two</li></ul>Line<br>break. Emoji 🚀 and Łódź.]]></description>
+    <content:encoded><![CDATA[<p>LONG CONTENT THAT MUST NOT WIN</p>]]></content:encoded>
+  </item>
+  <item>
+    <title>&lt;b&gt;Escaped&lt;/b&gt; HTML title</title>
+    <link>https://example.com/b</link>
+    <pubDate>Sat, 14 Nov 2026 09:05:00 GMT</pubDate>
+    <content:encoded><![CDATA[<style>p{color:red}</style><script>var x = "<p>no</p>";</script><!-- hidden --><p>Only content here.</p>]]></content:encoded>
+  </item>
+  <?some-processing instruction?>
+  <item>
+    <link>https://example.com/c</link>
+    <description>Plain text, &lt;b&gt;escaped&lt;/b&gt; HTML, and a b &lt; c comparison &amp; more.</description>
+  </item>
+</channel>
+</rss>

@@ -9,27 +9,38 @@
  *   - does ProDOS still read the boot volume afterwards? On a CoGS network
  *     disk that read shares the card's FIFOs with the stream.
  *
- * Nothing is parsed or kept; only the first few hundred bytes are shown.
+ * Milestone 3 adds the feed parser: with P on (the default) every chunk
+ * also goes through feed.c, and the report gives the item count, the
+ * first titles, and the time spent parsing. F parses a feed file from a
+ * ProDOS disk instead, which needs no card: that is how the emulator
+ * measures the parse rate.
  */
 #include <apple2.h>
 #include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "screen.h"
 #include "kbd.h"
 #include "tick.h"
 #include "cogs.h"
 #include "fmt.h"
 #include "ui.h"
+#include "feed.h"
+#include "xml.h"
 
 uint8_t disk_unit(void);
 uint8_t __fastcall__ disk_read_block(uint8_t unit, uint16_t block, void *buf);
 
-#define MENU_ROW    2           /* the six tests, then U, A, D, C */
+#define MENU_ROW    2           /* the six tests, then U/F, A, D, C/P */
 #define RES_COL     62          /* each test's one-word result */
 #define RES_W       17
 #define DETAIL_ROW  13          /* result, timing, reads, content */
-#define PREV_ROW    17          /* preview of the first bytes */
+#define PREV_ROW    17          /* first bytes, or first titles */
 #define PREV_ROWS   5
 #define DISK_ROW    22
+#define NTITLES     PREV_ROWS
+#define TITLE_W     74
 #define VAL_COL     11
 
 #define OPEN_LIMIT  (60u * TICKS_PER_SEC)   /* the card has its own timeouts */
@@ -51,13 +62,18 @@ static const struct test tests[] = {
 };
 #define NTESTS  (sizeof tests / sizeof tests[0])
 
-static uint8_t chunk[COGS_STREAM_HDR + 4096];
+/* Reads cycle 512 and 1024. Milestone 2 tried up to 4096, but 512 already
+ * kept the card's ring full; the memory now goes to the parser. */
+#define READ_MAX    1024
+static uint8_t chunk[COGS_STREAM_HDR + READ_MAX];
 static uint16_t chunk_max = 512;
 static char preview[481];
 static uint16_t npreview;
 static char buf[100];
 static char url[128];
 static uint8_t block[512];
+static uint8_t parse_on = 1;
+static char titles[NTITLES][TITLE_W + 1];
 
 /* What one fetch measured. */
 static struct {
@@ -70,6 +86,11 @@ static struct {
     uint16_t fail_at;               /* 0 at open, else the read that failed */
     uint8_t  lost_why, lost_op;     /* cogs_lost_* when rc is a timeout */
     uint16_t longest;               /* longest wait for one reply, in frames */
+    uint8_t  parsed;                /* the bytes went through feed.c */
+    uint8_t  kind;                  /* FEED_* */
+    uint16_t parse_ticks;           /* frames spent inside feed_chunk() */
+    uint16_t all_ticks;             /* frames from open to close */
+    int      file_err;              /* errno from a file that would not open */
 } r;
 
 /* ---- drawing ---- */
@@ -103,6 +124,7 @@ static void p_status_wait(uint16_t waited)
 static void draw_menu(void)
 {
     uint8_t i;
+    char *p;
 
     for (i = 0; i < NTESTS; ++i) {
         lb_clear(SC_SPACE);
@@ -111,10 +133,11 @@ static void draw_menu(void)
         lb_text(13, tests[i].url, 0);
         scr_blit((uint8_t)(MENU_ROW + i));
     }
-    row_text(MENU_ROW + 6, 4, "U", "type a URL", 0);
+    row_text(MENU_ROW + 6, 4, "U", "type a URL      F  parse a feed file on disk (no card needed)", 0);
     row_text(MENU_ROW + 7, 4, "A", "run 1 to 6, then check the disk", 0);
     row_text(MENU_ROW + 8, 4, "D", "check the disk: read the boot volume's directory block", 0);
-    fmt_str(fmt_u32(fmt_str(buf, "read size: "), chunk_max), " bytes (cycles 512, 1024, 2048, 4096)");
+    p = fmt_str(fmt_u32(fmt_str(buf, "read size "), chunk_max), "      P  parse while fetching: ");
+    fmt_str(p, parse_on ? "ON" : "OFF (raw transfer only)");
     row_text(MENU_ROW + 9, 4, "C", buf, 0);
 }
 
@@ -129,7 +152,6 @@ static void put_result(uint8_t row, const char *s, uint8_t inv)
         lb_text(4, tests[i].kind, 0);
         lb_text(13, tests[i].url, 0);
     } else {
-        lb_text(1, "U", 0);
         lb_text(4, url, 0);
     }
     lb_fill(RES_COL - 1, RES_W + 1, SC_SPACE);
@@ -181,12 +203,61 @@ static uint8_t card_clock(uint32_t *t)
     return 1;
 }
 
+/* ---- parsing ---- */
+
+static void xtick(void)
+{
+    tick_poll();
+}
+
+static uint8_t sink(const feed_item_t *it)
+{
+    uint16_t i = (uint16_t)(feed_items - 1);
+
+    if (i < NTITLES) {
+        strncpy(titles[i], it->title, TITLE_W);
+        titles[i][TITLE_W] = 0;
+    }
+    return 0;
+}
+
+static void parse_begin(void)
+{
+    uint8_t i;
+
+    for (i = 0; i < NTITLES; ++i) {
+        titles[i][0] = 0;
+    }
+    feed_sink = sink;
+    feed_begin();
+    xml_tick = xtick;
+    r.parsed = 1;
+}
+
+static void parse(const uint8_t *p, uint16_t n)
+{
+    uint16_t t;
+
+    tick_poll();
+    t = ticks;
+    feed_chunk(p, n);
+    tick_poll();
+    r.parse_ticks += (uint16_t)(ticks - t);
+}
+
+static void parse_end(void)
+{
+    r.kind = feed_end();
+    xml_tick = NULL;
+}
+
 static void fetch(const char *u)
 {
     cogs_chunk_t c;
     uint32_t t0 = 0, t1 = 0, t2 = 0;
     uint16_t quiet = 0, n;
     uint8_t clk;
+    char *p;
 
     memset(&r, 0, sizeof r);
     npreview = 0;
@@ -197,6 +268,9 @@ static void fetch(const char *u)
 
     status("OPENING");
     tick_reset();
+    if (parse_on) {
+        parse_begin();
+    }
     cogs_idle = idle;
     wait_begin("OPENING");
     r.rc = cogs_stream_open(u, (uint8_t)strlen(u));
@@ -207,6 +281,9 @@ static void fetch(const char *u)
         clk &= card_clock(&t1);
         r.open_secs = t1 - t0;
         r.have_clock = clk;
+        if (parse_on) {
+            parse_end();
+        }
         return;
     }
     clk &= card_clock(&t1);
@@ -236,8 +313,14 @@ static void fetch(const char *u)
                 preview[npreview] = 0;
             }
             r.total += c.len;
+            if (parse_on) {
+                parse(c.data, c.len);
+            }
             if (!(r.reads & 7)) {
-                fmt_str(fmt_u32(fmt_str(buf, "FETCHING "), r.total >> 10), "K");
+                p = fmt_str(fmt_u32(fmt_str(buf, "FETCHING "), r.total >> 10), "K");
+                if (parse_on) {
+                    fmt_str(fmt_u32(fmt_str(p, ", "), feed_items), " ITEMS");
+                }
                 status(buf);
             }
         }
@@ -263,10 +346,76 @@ static void fetch(const char *u)
     }
     cogs_stream_close();
     cogs_idle = NULL;
+    tick_poll();
+    r.all_ticks = ticks;
+    if (parse_on) {
+        parse_end();
+    }
     clk &= card_clock(&t2);
     r.have_clock = clk;
     r.open_secs = t1 - t0;
     r.xfer_secs = t2 - t1;
+}
+
+/* Parse a feed file from a ProDOS disk: no card, no network. Reads and
+ * parsing take turns, as they would with a stream. With P off it only
+ * reads, which times the disk alone. */
+static void parse_file(const char *path)
+{
+    int fd, n;
+    char *p;
+
+    memset(&r, 0, sizeof r);
+    npreview = 0;
+    preview[0] = 0;
+    status("READING");
+    tick_reset();
+    fd = open(path, O_RDONLY);
+    if (fd < 0) {
+        r.file_err = errno ? errno : -1;
+        return;
+    }
+    if (parse_on) {
+        parse_begin();
+    }
+    for (;;) {
+        n = read(fd, chunk, chunk_max);
+        tick_poll();
+        if (n <= 0) {
+            break;
+        }
+        ++r.reads;
+        if (npreview < sizeof preview - 1) {
+            uint16_t k = (uint16_t)(sizeof preview - 1 - npreview);
+            if (k > (uint16_t)n) {
+                k = (uint16_t)n;
+            }
+            memcpy(preview + npreview, chunk, k);
+            npreview += k;
+            preview[npreview] = 0;
+        }
+        r.total += (uint16_t)n;
+        if (parse_on) {
+            parse(chunk, (uint16_t)n);
+        }
+        if (!(r.reads & 7)) {
+            p = fmt_str(fmt_u32(fmt_str(buf, parse_on ? "PARSING " : "READING "), r.total >> 10), "K");
+            if (parse_on) {
+                fmt_str(fmt_u32(fmt_str(p, ", "), feed_items), " ITEMS");
+            }
+            status(buf);
+        }
+        if (key_ready() && key_get() == K_ESC) {
+            r.rc = COGS_E_ABORT;
+            break;
+        }
+    }
+    close(fd);
+    tick_poll();
+    r.all_ticks = ticks;
+    if (parse_on) {
+        parse_end();
+    }
 }
 
 /* ---- reporting ---- */
@@ -337,6 +486,54 @@ static void show_preview(void)
     }
 }
 
+/* Tenths of a second from frames, as "12.3 s". */
+static char *fmt_secs(char *p, uint16_t frames)
+{
+    uint16_t tenths = (uint16_t)((frames + 3) / 6);
+
+    p = fmt_u32(p, tenths / 10);
+    *p++ = '.';
+    return fmt_str(fmt_u32(p, tenths % 10), " s");
+}
+
+/* KB/s to one decimal from bytes and frames. */
+static char *fmt_rate(char *p, uint32_t bytes, uint16_t frames)
+{
+    uint32_t r10;
+
+    if (!frames) {
+        return fmt_str(p, "? KB/s");
+    }
+    r10 = bytes * 600 / frames / 1024;     /* tenths of KB/s; fits to 7 MB */
+    p = fmt_u32(p, r10 / 10);
+    *p++ = '.';
+    return fmt_str(fmt_u32(p, r10 % 10), " KB/s");
+}
+
+static void show_parsed(void)
+{
+    static const char *const kinds[] = { "no root element", "RSS 2.0", "Atom", "RSS 1.0 (RDF)", "NOT A FEED" };
+    uint8_t i;
+    char *p;
+
+    p = fmt_str(buf, kinds[r.kind]);
+    if (feed_title[0]) {
+        p = fmt_str(fmt_str(fmt_str(p, " \""), feed_title), "\"");
+    }
+    p = fmt_str(fmt_u32(fmt_str(p, ", "), feed_items), feed_items == 1 ? " item" : " items");
+    row_text(DETAIL_ROW + 3, VAL_COL, "Feed", buf, r.kind == FEED_NOT);
+
+    for (i = 0; i < PREV_ROWS; ++i) {
+        lb_clear(SC_SPACE);
+        if (i < NTITLES && titles[i][0]) {
+            linebuf[3] = sc_char((char)('1' + i), 0);
+            linebuf[4] = sc_char('.', 0);
+            lb_text(6, titles[i], 0);
+        }
+        scr_blit((uint8_t)(PREV_ROW + i));
+    }
+}
+
 static const char *lost_text(uint8_t why)
 {
     switch (why) {
@@ -391,7 +588,10 @@ static void report(uint8_t menu_row, uint8_t expect)
     }
 
     if (r.have_clock) {
-        p = fmt_str(fmt_u32(fmt_str(buf, "open "), r.open_secs), " s, transfer ");
+        /* The card's clock: whole seconds, but it cannot miss any. With P
+         * on, "transfer" includes the parsing done between reads. */
+        p = fmt_str(fmt_u32(fmt_str(buf, "open "), r.open_secs), " s, ");
+        p = fmt_str(p, r.parsed ? "fetch+parse " : "transfer ");
         p = fmt_str(fmt_u32(p, r.xfer_secs), " s");
         if (r.xfer_secs && r.total) {
             rate10 = r.total * 10 / r.xfer_secs / 1024;
@@ -399,9 +599,22 @@ static void report(uint8_t menu_row, uint8_t expect)
             *p++ = '.';
             p = fmt_str(fmt_u32(p, rate10 % 10), " KB/s");
         }
-        fmt_str(p, "  (card clock, whole seconds)");
+        if (r.parsed) {
+            p = fmt_secs(fmt_str(p, "; parsing >= "), r.parse_ticks);
+        } else {
+            fmt_str(p, "  (card clock, whole seconds)");
+        }
+    } else if (r.parsed) {
+        /* No card: frames only. A floor, not a measurement: they are
+         * counted between tags, and cleaning a long body can pass several
+         * unseen. Measured against a wall clock at 1 MHz it was close. */
+        p = fmt_secs(fmt_str(buf, "at least: all "), r.all_ticks);
+        p = fmt_rate(fmt_str(p, " ("), r.total, r.all_ticks);
+        p = fmt_secs(fmt_str(p, "), parsing "), r.parse_ticks);
+        p = fmt_rate(fmt_str(p, " ("), r.total, r.parse_ticks);
+        fmt_str(p, ")");
     } else {
-        fmt_str(buf, "no card clock in this firmware's STATUS reply");
+        fmt_str(buf, "no card clock here: no timing");
     }
     row_text(DETAIL_ROW + 1, VAL_COL, "Timing", buf, 0);
 
@@ -411,8 +624,12 @@ static void report(uint8_t menu_row, uint8_t expect)
     fmt_str(fmt_u32(p, (r.longest + TICKS_PER_SEC / 2) / TICKS_PER_SEC), " s");
     row_text(DETAIL_ROW + 2, VAL_COL, "Reads", buf, 0);
 
-    row_text(DETAIL_ROW + 3, VAL_COL, "Content", content_kind(), 0);
-    show_preview();
+    if (r.parsed) {
+        show_parsed();
+    } else {
+        row_text(DETAIL_ROW + 3, VAL_COL, "Content", content_kind(), 0);
+        show_preview();
+    }
 }
 
 static void disk_check(void)
@@ -448,20 +665,20 @@ static void run_test(uint8_t i)
     disk_check();
 }
 
-/* A line editor on the URL row. 0 if cancelled. */
-static uint8_t ask_url(void)
+/* A line editor on the U/F row, editing url[]. 0 if cancelled. */
+static uint8_t ask_url(const char *key, const char *what, const char *go)
 {
     uint8_t n = (uint8_t)strlen(url), k;
     const uint8_t row = MENU_ROW + 6, col = 7, max = RES_COL - 2 - col;
 
     for (;;) {
         lb_clear(SC_SPACE);
-        lb_text(1, "U", 0);
+        lb_text(1, key, 0);
         lb_text(4, "> ", 0);
         lb_text(col, url, 0);
         linebuf[col + n] = SC_ISPACE;       /* the cursor */
         scr_blit(row);
-        status_fields("FETCH PROBE", "TYPE A URL", "RETURN FETCHES  ESC CANCELS");
+        status_fields("FETCH PROBE", what, go);
 
         k = key_get();
         if (k == K_ESC) {
@@ -515,7 +732,7 @@ int main(void)
     }
 
     for (;;) {
-        status("PRESS 1-6, U, A, D, C   ESC QUITS");
+        status("PRESS 1-6, U, F, A, D, C, P   ESC QUITS");
         k = key_get();
         if (k >= 'a' && k <= 'z') {
             k = (uint8_t)(k - 32);
@@ -523,7 +740,7 @@ int main(void)
         if (k == K_ESC) {
             break;
         }
-        if (!card && k != 'D' && k != 'C') {
+        if (!card && k != 'D' && k != 'C' && k != 'F' && k != 'P') {
             continue;
         }
         if (k >= '1' && k < '1' + NTESTS) {
@@ -535,10 +752,33 @@ int main(void)
         } else if (k == 'D') {
             disk_check();
         } else if (k == 'C') {
-            chunk_max = chunk_max >= 4096 ? 512 : (uint16_t)(chunk_max * 2);
+            chunk_max = chunk_max >= READ_MAX ? 512 : (uint16_t)(chunk_max * 2);
             draw_menu();
+        } else if (k == 'P') {
+            parse_on = (uint8_t)!parse_on;
+            draw_menu();
+        } else if (k == 'F') {
+            if (ask_url("F", "PATHNAME, E.G. /FEEDS/ARS.XML", "RETURN PARSES  ESC CANCELS")) {
+                /* ProDOS 8 wants pathnames in uppercase. */
+                for (i = 0; url[i]; ++i) {
+                    if (url[i] >= 'a' && url[i] <= 'z') {
+                        url[i] = (char)(url[i] - 32);
+                    }
+                }
+                put_result(MENU_ROW + 6, "...", 0);
+                parse_file(url);
+                if (r.file_err) {
+                    put_result(MENU_ROW + 6, "CANNOT OPEN", 1);
+                    fmt_u32(fmt_str(buf, "could not open the file, error "), (uint32_t)r.file_err);
+                    row_text(DETAIL_ROW, VAL_COL, "Result", buf, 1);
+                } else {
+                    report(MENU_ROW + 6, 0);
+                }
+            } else {
+                draw_menu();
+            }
         } else if (k == 'U') {
-            if (ask_url()) {
+            if (ask_url("U", "TYPE A URL", "RETURN FETCHES  ESC CANCELS")) {
                 put_result(MENU_ROW + 6, "...", 0);
                 fetch(url);
                 report(MENU_ROW + 6, 0);

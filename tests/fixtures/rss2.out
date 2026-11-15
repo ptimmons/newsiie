@@ -1,0 +1,26 @@
+ITEM
+  title: It's "quoted" -- and naive
+  link:  https://example.com/a?x=1&y=2
+  date:  2026-11-13 16:39
+  guid:  tag:example.com,2026:a
+  | First paragraph with bold and a link.
+  | Second one 's here...
+  | - one
+  | - two
+  | Line
+  | break. Emoji ? and Lodz.
+ITEM
+  title: Escaped HTML title
+  link:  https://example.com/b
+  date:  2026-11-14 09:05
+  guid:  https://example.com/b
+  | Only content here.
+ITEM
+  title: (no title)
+  link:  https://example.com/c
+  date:  
+  guid:  https://example.com/c
+  | Plain text, escaped HTML, and a b < c comparison & more.
+KIND rss
+FEED Cafe & Friends -- News
+ITEMS 3

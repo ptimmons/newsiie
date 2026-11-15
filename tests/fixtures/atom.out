@@ -1,0 +1,23 @@
+ITEM
+  title: Entry one
+  link:  https://example.org/1?a=1&b=2
+  date:  2026-11-14 16:44
+  guid:  urn:uuid:1
+  | Short summary.
+ITEM
+  title: Entry two
+  link:  https://example.org/2
+  date:  2026-11-13 00:00
+  guid:  urn:uuid:2
+  | Para one.
+  | Para two.
+  | - alpha
+  | - beta
+ITEM
+  title: Prefixed entry
+  link:  https://example.org/3
+  date:  
+  guid:  urn:uuid:3
+KIND atom
+FEED Atom & Eve
+ITEMS 3

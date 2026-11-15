@@ -6,8 +6,9 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestones 0, 1 and 2 are done and verified on a real card
-(see section 9). Next is milestone 3, the feed parser.
+**Status:** milestones 0 to 3 are done and verified on a real card (see
+section 9). Next is milestone 4: the item store in aux memory and the
+Headlines view. Memory is now the constraint to plan around (section 5).
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -138,13 +139,26 @@ chunk, and `Esc` aborts. Failures are short status-bar messages: `COGS: DNS FAIL
 
 | Range | Use |
 |---|---|
-| main `$0800–$1FFF` | ProDOS I/O buffer, stream chunk buffer (6-byte header + 512 data) |
-| main `$2000–~$7FFF` | program: code, rodata, data, bss (24K budget; a custom linker config like a2chat's) |
-| main `~$8000–$BEFF` | item index, feed table, wrap line index, C stack; no `malloc` heap |
+| main `$0800–$1FFF` | `LOWBSS` (M3): the parser's big buffers, 6K, never loaded and not zeroed |
+| main `$2000–$B6FF` | program: code, rodata, data, bss, then the heap (ProDOS file buffers come from it) |
+| main `$B700–$BEFF` | C stack, 2K |
 | aux `$0800–$BFFF` | item store, 47K, through `auxmem.s` |
 
-If the program outgrows 24K, the first move is a2chat's: put cold code
-(feed editing, help) in an overlay or the language card.
+**Measured in M3:** FETCH (probe UI, CoGS, parser) is 27K of code and
+4.3K of read-only data, about 32K loaded, with `-Or`. The parser alone is
+about 12K of code (`xml.c` 4.4K, `clean.c` 5.7K, `feed.c` 1.9K) plus 6K
+of buffers in `LOWBSS`. The app adds the store, three views and the feeds
+file on top of the parser and card code, so it will be tight. The levers,
+in order:
+
+1. **Keep the probes out of the app.** FETCH's own UI is 7K; the app's
+   views replace it, they do not add to it.
+2. **Overlays from disk, between fetches only** (section 1, rule 1):
+   help, the feed editor and article save are cold and can load on demand.
+3. **The language card's free 3K** (`$D400-$DFFF`, bank 2, behind the quit
+   code), for code cc65 copies there at startup.
+4. **Move hot C to assembly**, which is smaller as well as faster:
+   `clean()`'s per-byte loop is the obvious candidate.
 
 `/RAM` is disconnected at startup, since ProDOS puts it in the same aux
 memory (patch the slot 3 drive 2 vector and remove `$BF` from `DEVLST`). Only
@@ -213,7 +227,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 0 ✅ | Repo scaffold, Makefile, linker config, screen primitives, splash, empty Feeds view, status bar, help box, bootable disk | Virtual ][ (splash, Feeds, help, OA-Q to ProDOS) |
 | 1 ✅ | `cogs_io.s` + `cogs.c` with host model tests; `PROBE.SYSTEM`: find the card, PING, wait for link, show firmware, IP, time, data integrity both ways | host tests ✅, Virtual ][ no-card path ✅, **real card ✅** |
 | 2 ✅ | `FETCH.SYSTEM`: stream a URL to the end and report bytes, KB/s at four read sizes, content type (XML / gzip / HTML), and result codes for http, https, a redirect, a 404; then read the boot volume through ProDOS | host tests ✅, Virtual ][ menu and disk check ✅, **real card ✅** — settled the risks below |
-| 3 | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests, Virtual ][ |
+| 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
 | 4 | Item store in aux; Headlines screen with scrolling | suite |
 | 5 | Article screen: cleaning, UTF-8 folding, word wrap, paging | suite |
 | 6 | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | suite |
@@ -388,4 +402,54 @@ Milestones 1–2 and 3 are independent and could run in parallel.
   parser will set the real rate; 512 is enough for now, and larger reads or
   a BULK burst read are the first levers if transfer ever dominates.
 - **Network disk:** streams and ProDOS block reads alternate cleanly.
+
+### Milestone 3 notes
+
+- **Three layers.** `xml.c` is a streaming scanner: every state survives a
+  chunk boundary, text it was not asked for is skipped at `scan()` speed,
+  CDATA, comments, PIs, DOCTYPE internal subsets and self-closing tags are
+  handled, and nothing is fatal. `feed.c` maps RSS 2.0, RSS 1.0 (RDF) and
+  Atom onto one item (title, link, date, guid, body), preferring the short
+  `description`/`summary` over `content:encoded`/`content`, and hands each
+  item to a sink as it closes, so memory does not grow with the feed.
+  `clean.c` strips HTML, decodes entities, folds Unicode to ASCII, collapses
+  whitespace and normalises dates to `YYYY-MM-DD HH:MM`. `scan.s` is the
+  assembly inner loop (18 cycles a byte); `scan_host.c` is its twin.
+- **Latin-1 feeds** (Slashdot declares ISO-8859-1) are turned into UTF-8 as
+  they are captured, so the cleaner sees one encoding.
+- **Code points are 16-bit.** 32-bit arithmetic is costly 6502 code, and
+  nothing past U+FFFF folds to anything but `?`.
+- **Caps per item:** title 160, link 511 (BBC's tracking links pass 400),
+  guid 255, body 2000 after cleaning (3K captured).
+- **Tests.** `make host-test`: 719 card-protocol checks, 66 cleaner checks,
+  and 7 hand-written fixtures (RSS 2.0, Atom with xhtml content and
+  prefixed elements, Latin-1 RDF, a truncated feed, an HTML page, edge
+  cases, caps), each matching its expected output exactly at chunk sizes
+  1, 7 and 512. `make corpus` fetches 10 live feeds (`tools/getcorpus.sh`,
+  not committed: they are other people's writing) and checks that the item
+  links match Python's own XML parser exactly, the output is ASCII, and
+  the result does not depend on chunk size. All 10 pass.
+- **On the 6502** (Virtual ][, FETCH's `F` key, feeds on a second disk):
+  Hacker News 20 items, Ars Technica 20, BBC 37, xkcd 4, titles identical
+  to the Mac's. **Parse rate at 1 MHz: about 13 KB/s.** Ars Technica's 75K
+  took 51 s to read and parse and 45 s to read alone (the emulated floppy
+  is slow), so parsing cost about 6 s; the frame counter's floor said
+  4.5 s. With the network at 19 KB/s, fetch-and-parse should come to about
+  7-8 KB/s: 10 s for a 75K feed, 30 s for NASA's 250K.
+- **Frame timing is a floor.** Frames are counted only between tags, and
+  cleaning a long body can pass several unseen; and at Virtual ]['s
+  "maximum" speed frames are not a clock at all. Timing runs at "regular"
+  speed against a wall clock, and the card's clock on real hardware.
+- **Memory:** see section 5. FETCH's largest read is now 1024 (it was
+  4096); 512 already kept the card's ring full.
+- `vii.sh insert S6D2 <image>` mounts a second disk; Virtual ][ has no
+  `return` key name, so `vii.sh ret` types `$0D`.
+- **Real card, parsing while fetching (2026-11-14):** all six tests pass
+  with the parser on. NASA, 252,742 bytes: **fetch and parse 27 s, 9.1
+  KB/s**, 10 items, titles right; open 0 s, no empty reads, ring full,
+  longest wait 1 s; the boot volume read fine after. Transfer alone was
+  13 s in milestone 2, so parsing cost about 14 s, about 18 KB/s: faster
+  than Ars Technica's 13 KB/s because NASA's long `content:encoded` bodies
+  are skipped at `scan()` speed. The frame floor read 3.3 s, a large
+  undercount, as expected.
 

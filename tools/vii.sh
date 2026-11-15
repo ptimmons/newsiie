@@ -5,6 +5,7 @@
 # Nothing here closes a machine, so other sessions in the emulator are safe.
 #
 #   boot <image>          insert into S6D1 and cold-restart
+#   insert <dev> <image>  put a disk in a drive, e.g. S6D2
 #   screen                the screen as text, blank lines stripped
 #   screen-raw            all 24 rows
 #   await <text> [secs]   wait for text to appear; exit 1 on timeout
@@ -64,6 +65,24 @@ EOF
     as "set speed of (last machine) to ${VII_SPEED:-maximum}" >/dev/null
     as "set keyboard delay of (last machine) to ${VII_KEYDELAY:-0.2}" >/dev/null
     echo "booted $img"
+    ;;
+# insert <device> <image> -- e.g. insert S6D2 build/FEEDS.po
+insert)
+    dev="${1:?usage: vii.sh insert <device> <image>}"
+    img="${2:?usage: vii.sh insert <device> <image>}"
+    img="$(cd "$(dirname "$img")" && pwd)/$(basename "$img")"
+    osascript >/dev/null <<EOF
+tell application "$APP"
+    tell last machine
+        try
+            eject device "$dev"
+        end try
+        delay 0.3
+        insert "$img" into device "$dev"
+    end tell
+end tell
+EOF
+    echo "inserted $img in $dev"
     ;;
 screen)     as 'return (content of (compact screen text of (last machine))) as string' ;;
 screen-raw) as 'return (content of (screen text of (last machine))) as string' ;;

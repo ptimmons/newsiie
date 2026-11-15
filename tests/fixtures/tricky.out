@@ -1,0 +1,14 @@
+ITEM
+  title: Brackets ]] and ] done]]>
+  link:  https://example.com/t
+  date:  
+  guid:  https://example.com/t
+  | Unknown entity, stray & ampersand, ABC, &bogus; stays.
+ITEM
+  title: Self-closing in a title?
+  link:  https://example.com/u
+  date:  
+  guid:  https://example.com/u
+KIND rss
+FEED Tricky
+ITEMS 2
