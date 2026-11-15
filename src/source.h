@@ -18,6 +18,7 @@
 #define SRC_E_NOTFEED   0xF9    /* it parsed, but it is not a feed */
 #define SRC_E_EMPTY     0xFA    /* a feed with no items */
 #define SRC_E_NOCLOCK   0xFB    /* https, but the card's clock is not set */
+#define SRC_E_STALLED   0xFC    /* 30 s with no new data from the server */
 
 /* Fetch url into the store (clearing it first). Returns 0, COGS_E_ABORT
  * (stopped, items so far kept), or an error. */

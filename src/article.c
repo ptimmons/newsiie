@@ -80,6 +80,12 @@ static void compose(void)
     } else {
         wrap_line("(This item has no summary.)", 27, WIDTH);
     }
+    if (wrap_full) {
+        /* More lines than the table holds: say so on the last one. */
+        wrap_lines[WRAP_MAX - 1].p = "[Too long to show in full.]";
+        wrap_lines[WRAP_MAX - 1].len = 27;
+        wrap_lines[WRAP_MAX - 1].kind = WK_TEXT;
+    }
     top = 0;
 }
 

@@ -41,6 +41,7 @@ const char *source_error(uint8_t rc)
     case SRC_E_NOTFEED:  return "THAT IS NOT A FEED";
     case SRC_E_EMPTY:    return "THE FEED HAS NO ITEMS";
     case SRC_E_NOCLOCK:  return "THE CARD'S CLOCK IS NOT SET, AND HTTPS NEEDS IT";
+    case SRC_E_STALLED:  return "THE SERVER STOPPED SENDING";
     }
     return cogs_strerror(rc);
 }
@@ -177,7 +178,7 @@ static uint8_t from_stream(const char *url)
         if (!c.len) {
             tick_wait(1);
             if (++quiet > STALL_LIMIT) {
-                rc = COGS_E_TIMEOUT;
+                rc = SRC_E_STALLED;
             }
         }
         if (esc_pressed()) {

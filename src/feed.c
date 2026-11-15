@@ -113,11 +113,45 @@ static void start_item(uint8_t depth)
     body_prio = date_prio = 0;
 }
 
+/* A summary cut at a cap says so, as its own last paragraph. */
+static const char cut_note[] = "\n[Shortened: too long for newsiie to show in full.]";
+#define CUT_LEN     (sizeof cut_note - 1)
+
+static uint16_t mark_cut(uint16_t n)
+{
+    uint8_t back;
+
+    if (n > FEED_BODY_MAX - CUT_LEN) {
+        n = FEED_BODY_MAX - CUT_LEN;
+    }
+    /* End on a word if one ends nearby. */
+    for (back = 0; back < 40 && n && out_body[n - 1] != ' '; ++back) {
+        --n;
+    }
+    if (back == 40) {
+        n += back;
+    }
+    while (n && (out_body[n - 1] == ' ' || out_body[n - 1] == '\n' || out_body[n - 1] == '\r')) {
+        --n;
+    }
+    memcpy(out_body + n, cut_note, CUT_LEN + 1);
+    return (uint16_t)(n + CUT_LEN);
+}
+
 static void end_item(void)
 {
+    uint16_t n;
+
     in_item = 0;
 
-    clean(out_title, sizeof out_title, raw_title, len_title, CLEAN_LINE);
+    n = clean(out_title, sizeof out_title, raw_title, len_title, CLEAN_LINE);
+    if (len_title >= RAW_TITLE || n >= FEED_TITLE_MAX) {
+        /* Cut: say so with "...". */
+        if (n > FEED_TITLE_MAX - 3) {
+            n = FEED_TITLE_MAX - 3;
+        }
+        memcpy(out_title + n, "...", 4);
+    }
     if (!out_title[0]) {
         strcpy(out_title, "(no title)");
     }
@@ -128,7 +162,11 @@ static void end_item(void)
     item.link = raw_link;
     item.date = out_date;
     item.guid = raw_guid[0] ? raw_guid : raw_link;
-    item.body_len = clean(out_body, sizeof out_body, raw_body, len_body, CLEAN_BODY);
+    n = clean(out_body, sizeof out_body, raw_body, len_body, CLEAN_BODY);
+    if (len_body >= RAW_BODY || n >= FEED_BODY_MAX) {
+        n = mark_cut(n);
+    }
+    item.body_len = n;
     item.body = out_body;
 
     ++feed_items;

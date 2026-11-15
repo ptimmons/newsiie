@@ -18,6 +18,7 @@
 - [Appendix A: Quick Reference](#appendix-a-quick-reference)
 - [Appendix B: Messages](#appendix-b-messages)
 - [Appendix C: For the Technically Curious](#appendix-c-for-the-technically-curious)
+- [Appendix D: newsiie's Limits](#appendix-d-newsiies-limits)
 
 ---
 
@@ -38,8 +39,9 @@ headlines to the story itself. **Chapter 3** shows how to add the feeds
 you like and remove the ones you don't. **Chapter 4** explains how
 newsiie remembers what you've read and how to save a story to disk. At
 the back of the guide you'll find a one-page summary of the keys, a list
-of the messages newsiie can show you, and some notes for people who want
-to know how it all works.
+of the messages newsiie can show you, some notes for people who want to
+know how it all works, and a list of newsiie's limits: how much it can
+hold, and what it does when a feed has more.
 
 ### What Is a Feed?
 
@@ -160,6 +162,13 @@ bar says `READING`; a feed from the Internet says `FETCHING`.
 > **By the way:** If a feed is taking too long, press ESC. newsiie stops,
 > and you can read whatever has arrived so far.
 
+> **Important:** newsiie can hold up to 160 stories from a feed at once,
+> as long as they fit in its memory: about 42,000 characters in all. Most
+> feeds fit easily. If a feed has more, newsiie keeps the stories that
+> come first, which in most feeds are the newest, and stops fetching. The
+> heading of the Headlines screen then says "no room for more." Appendix D
+> has the details.
+
 ### The Headlines Screen
 
 When the feed has arrived, you'll see its **Headlines screen**: one
@@ -202,6 +211,11 @@ under the line, its summary.
   before. You don't need to go back to the headlines in between.
 - Press ESC when you're finished. You return to the Headlines screen,
   with the bar on the story you were reading.
+
+If a story's summary is longer than newsiie can show (more than 2,000
+characters), newsiie shows the first part and ends it with the note
+**[Shortened: too long for newsiie to show in full.]** A headline that's
+too long ends with three dots.
 
 Notice that the diamond is gone from each story you've read.
 
@@ -282,6 +296,12 @@ https://xkcd.com/atom.xml
 
 A line with only an address is named after its website. A line that
 begins with # is a note for you; newsiie skips it.
+
+newsiie reads up to 21 feeds from the file. A name can be up to 31
+characters (the Feeds screen shows the first 22), and an address up to
+127. If a line has no address, an address that's too long, or comes after
+the 21st feed, newsiie leaves it out and tells you when it starts, for
+example `2 LINES OF NEWSIIE.FEEDS NOT USED`.
 
 > **By the way:** As the first line shows, a feed doesn't have to come
 > from the Internet. If you have a feed saved as a file, give its ProDOS
@@ -434,6 +454,14 @@ again in a minute; if it keeps happening, check the card's clock settings.
 The website didn't answer. It may be busy or out of service; try again
 later.
 
+**THE SERVER STOPPED SENDING**
+The website began sending the feed, then sent nothing for 30 seconds.
+You can read whatever arrived.
+
+**CARD STOPPED ANSWERING**
+The CoGS card didn't answer newsiie for a minute. Turn the computer off
+and on again; if it keeps happening, run PROBE.SYSTEM (see Appendix C).
+
 **THE SERVER REFUSED IT (OR NOT FOUND)**
 The website answered, but not with the feed. The feed may have moved.
 
@@ -452,9 +480,26 @@ read.
 You pressed ESC while newsiie was waiting for a website. It stops as
 soon as the website replies.
 
-**"memory full" in the heading**
-The feed was larger than newsiie can hold at once. You can read the
-stories that arrived first.
+**"no room for more" in the heading**
+The feed had more stories than newsiie can hold at once (see Appendix
+D). You can read the stories that arrived first.
+
+**[Shortened: too long for newsiie to show in full.]** at the end of a story
+The story's summary is longer than newsiie can show. You see the first
+part.
+
+**[Too long to show in full.]** at the end of a story
+The summary was laid out into more lines than newsiie can keep on the
+Article screen. This is rare.
+
+**1 LINE OF NEWSIIE.FEEDS NOT USED** (or 2 LINES, and so on)
+Some lines of your feed list couldn't be used: a line with no address, an
+address longer than 127 characters, or a feed after the 21st. Open the
+file in a text editor to see which.
+
+**COULD NOT READ NEWSIIE.FEEDS, ERROR $nn**
+newsiie found the feed list but couldn't read it. The number is the
+ProDOS error code.
 
 **THE DISK IS WRITE-PROTECTED**
 newsiie couldn't save to the disk. See "If the Disk Can't Be Changed" in
@@ -504,6 +549,57 @@ them, quit newsiie and choose one from the ProDOS menu.
 |---|---|
 | `NEWSIIE.FEEDS` | your list of feeds, as text |
 | `NEWSIIE.READ` | the stories you've read |
+
+---
+
+## Appendix D: newsiie's Limits
+
+The Apple IIe is a small computer, and the news is large. newsiie makes
+the most of the memory it has, but some feeds and stories are bigger than
+it can hold. This appendix lists every limit, and what newsiie does when
+a feed reaches one.
+
+### How Much newsiie Can Hold
+
+| | Limit | When a feed has more |
+|---|---|---|
+| The size of a feed | none | newsiie reads a feed a piece at a time, as it arrives, so a feed of any size can be fetched. |
+| Stories from one feed | 160, and about 42,000 characters in all | newsiie keeps the stories that come first, which in most feeds are the newest, and stops fetching. The Headlines heading says "no room for more." |
+| A story's summary | 2,000 characters | newsiie shows the first part, ending it with "[Shortened: too long for newsiie to show in full.]" |
+| A story's headline | 160 characters | The headline ends with three dots. |
+| A story's address | 511 characters | The Article screen shows the first 78, ending with >; a saved story has the address in full, up to 511. |
+| Lines on the Article screen | 140 | The last line says "[Too long to show in full.]" This is rare. |
+| Feeds in your list | 21 | OPEN-APPLE-A says the list is full; extra lines in NEWSIIE.FEEDS are left out, and newsiie tells you how many. |
+| A feed's name | 31 characters | The Feeds screen shows the first 22. |
+| A feed's address | 127 characters | You can't type more; a longer address in NEWSIIE.FEEDS is left out, and newsiie tells you. |
+| Stories remembered as read | the last 256 | The oldest is forgotten, and shows its diamond again if it's still in the feed. |
+| Time to wait for a website | 30 seconds without new data | newsiie stops, says THE SERVER STOPPED SENDING, and keeps what arrived. |
+| Time to wait for the CoGS card | 60 seconds for each answer | newsiie stops and says CARD STOPPED ANSWERING. The card answers far sooner in practice; it times out a website itself and says so. |
+
+> **By the way:** A summary of 2,000 characters fills about one and a
+> half screens on the Article screen. Most feeds' summaries are far
+> shorter; of ten popular feeds tested, only one had summaries this long.
+
+> **By the way:** newsiie tells the stories it has read apart by a short
+> code made from each one. Very rarely, two different stories share a
+> code, and a new story arrives already marked as read.
+
+### What newsiie Doesn't Do
+
+- **Full stories.** newsiie shows the headline and summary a feed
+  carries. It doesn't fetch the web page the story's address points to.
+- **Pictures and sound.** Pictures, videos and podcasts in a feed are
+  skipped. Tables and lists become plain lines of text.
+- **Every alphabet.** The Apple IIe shows the letters of English.
+  Accented letters are shown without their accents (é becomes e), curly
+  quotes and dashes become plain ones, and characters with no near
+  equivalent, such as Greek, Russian, Chinese or emoji, appear as ?.
+- **Feeds that need a password.** newsiie can't sign in to a website.
+- **Time zones.** Dates and times are shown as the feed gives them, in
+  the publisher's time zone, not changed to yours.
+- **Compressed feeds.** newsiie asks every website for its feed
+  uncompressed. A website that sends it compressed anyway is reported as
+  "THAT IS NOT A FEED."
 
 ---
 

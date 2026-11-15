@@ -56,10 +56,10 @@ int main(void)
     CHECK(!parse(""));
     CHECK(!parse("   "));
     CHECK(!parse("# a comment"));
-    CHECK(!parse("Name only|"));
+    CHECK(parse("Name only|") == 2);
     memset(longurl, 'x', sizeof longurl - 1);
     longurl[sizeof longurl - 1] = 0;
-    CHECK(!parse(longurl));                         /* past FL_URL: refused */
+    CHECK(parse(longurl) == 2);                     /* past FL_URL: refused */
     CHECK(parse("An extremely long feed name that goes on and on|https://a.b/"));
     CHECK(strlen(name) == FL_NAME);
 
@@ -112,11 +112,20 @@ int main(void)
     f = fopen(FL_FILE, "w");
     fputs("# mine\n\nA|https://a/\nhttps://www.b.org/rss\n# done\nC|https://c/", f);
     fclose(f);
-    CHECK(fl_load() == 0 && fl_count == 3);
+    CHECK(fl_load() == 0 && fl_count == 3 && fl_skipped == 0);
     fl_get(1);
     CHECK(!strcmp(fl_name, "b.org") && !strcmp(fl_url, "https://www.b.org/rss"));
     fl_get(2);
     CHECK(!strcmp(fl_name, "C"));
+
+    /* Lines it cannot use, and feeds past the 21st, are counted. */
+    f = fopen(FL_FILE, "w");
+    fputs("A|https://a/\nNo address|\n", f);
+    for (i = 0; i < FL_MAX + 2; ++i) {
+        fprintf(f, "F%u|https://f%u/\n", i, i);
+    }
+    fclose(f);
+    CHECK(fl_load() == 0 && fl_count == FL_MAX && fl_skipped == 1 + 3);
     unlink(FL_FILE);
 
     CHECK(out_of_bounds == 0);

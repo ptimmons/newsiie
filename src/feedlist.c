@@ -19,6 +19,7 @@ void __fastcall__ aux_get(void *dst, uint16_t aux_src, uint16_t n);
 #define SCRATCH_MAX (FEED_SCRATCH_SIZE - 1)
 
 uint8_t fl_count;
+uint8_t fl_skipped;
 uint8_t fl_oserror;
 char    fl_name[FL_NAME + 1];
 char    fl_url[FL_URL + 1];
@@ -133,7 +134,7 @@ uint8_t fl_parse(const char *line, uint16_t n, char *name, char *url)
         un = n;
     }
     if (!un || un > FL_URL) {
-        return 0;                   /* no URL, or too long to open */
+        return 2;                   /* no URL, or too long to open */
     }
     memcpy(url, u, un);
     url[un] = 0;
@@ -154,6 +155,7 @@ uint8_t fl_load(void)
     uint16_t n = 0, i, start;
 
     fl_count = 0;
+    fl_skipped = 0;
     fl_oserror = 0;
     fd = open(FL_FILE, O_RDONLY);
     if (fd < 0) {
@@ -169,11 +171,21 @@ uint8_t fl_load(void)
     }
     close(fd);
 
-    /* Lines end in CR (ProDOS) or LF (a Mac), and the last may not end. */
-    for (start = i = 0; i <= n && fl_count < FL_MAX; ++i) {
+    /* Lines end in CR (ProDOS) or LF (a Mac), and the last may not end.
+     * A line that cannot be used, or a feed past the 21st, is counted. */
+    for (start = i = 0; i <= n; ++i) {
         if (i == n || SCRATCH[i] == '\r' || SCRATCH[i] == '\n') {
-            if (fl_parse(SCRATCH + start, (uint16_t)(i - start), fl_name, fl_url)) {
-                put(fl_count++);
+            switch (fl_parse(SCRATCH + start, (uint16_t)(i - start), fl_name, fl_url)) {
+            case 1:
+                if (fl_count < FL_MAX) {
+                    put(fl_count++);
+                } else {
+                    ++fl_skipped;
+                }
+                break;
+            case 2:
+                ++fl_skipped;
+                break;
             }
             start = (uint16_t)(i + 1);
         }

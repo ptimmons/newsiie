@@ -27,6 +27,7 @@
 #define FL_ENTRY    (FL_NAME + 1 + FL_URL + 1)
 
 extern uint8_t fl_count;
+extern uint8_t fl_skipped;          /* lines fl_load() could not use */
 
 /* The entry fl_get() last read. */
 extern char fl_name[FL_NAME + 1];
@@ -47,8 +48,9 @@ void fl_get(uint8_t i);
 uint8_t fl_add(const char *name, const char *url);  /* 0 or FL_E_FULL */
 void fl_delete(uint8_t i);
 
-/* One line of the file into a name and URL (both NUL-terminated, cut to
- * size). Returns 0 for a line with no feed (blank, comment, no URL). */
+/* One line of the file into a name and URL (both NUL-terminated, the name
+ * cut to size). Returns 1 for a feed, 0 for a blank line or a comment, and
+ * 2 for a line that cannot be used: no URL, or one past FL_URL. */
 uint8_t fl_parse(const char *line, uint16_t n, char *name, char *url);
 
 /* A name from a URL: its host, without "www.". */

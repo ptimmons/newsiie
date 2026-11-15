@@ -52,6 +52,10 @@ int main(void)
     if (fl_load() == FL_E_READ) {
         fmt_hex8(fmt_str(note, "COULD NOT READ NEWSIIE.FEEDS, ERROR $"), fl_oserror);
         feeds_note = note;
+    } else if (fl_skipped) {
+        fmt_str(fmt_u32(note, fl_skipped),
+                fl_skipped == 1 ? " LINE OF NEWSIIE.FEEDS NOT USED" : " LINES OF NEWSIIE.FEEDS NOT USED");
+        feeds_note = note;
     }
     rs_load();
     store_is_read = rs_has;

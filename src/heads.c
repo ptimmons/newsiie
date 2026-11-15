@@ -65,7 +65,7 @@ static void draw(void)
 
     p = fmt_str(fmt_u32(note, store_count), store_count == 1 ? " item" : " items");
     if (store_full) {
-        fmt_str(p, ", memory full");
+        fmt_str(p, ", no room for more");
     } else if (source_rc == COGS_E_ABORT) {
         fmt_str(p, ", stopped early");
     } else if (source_rc) {

@@ -623,3 +623,28 @@ This milestone added what a live network needs:
   (`NEWSIIE_SHOTS` in net.c), which the manual points out.
 - Feed names longer than the Feeds screen's 22-character column are now
   clipped instead of running into the URL.
+
+### Limits, made visible and documented (after 0.9)
+
+- **Every limit is now in the manual** (Appendix D, with a table of each
+  limit and what happens at it, and a list of what newsiie does not do),
+  with notes where the reader meets them and every message in Appendix B.
+- **No more silent truncation:** a summary cut at 2,000 characters (or at
+  the 3K captured before cleaning) ends on a word with "[Shortened: too
+  long for newsiie to show in full.]"; a headline cut at 160 ends in
+  "..."; an article past the 140-line wrap table says "[Too long to show
+  in full.]"; lines of NEWSIIE.FEEDS that cannot be used (no address, one
+  past 127 characters, a feed past the 21st) are counted and reported at
+  startup. A feed that stops sending for 30 s now says "THE SERVER STOPPED
+  SENDING" rather than blaming the card. The Headlines note "memory full"
+  became "no room for more", since the 160-item cap also sets it. In the
+  corpus, only Slashdot's summaries (9 of 15) are shortened, and Python
+  confirms they are over 2,000 characters of text.
+- **A memory bug caught on the way:** those additions left 1.1K of heap,
+  and cc65's open() needs a 1K page-aligned ProDOS buffer (up to ~1.3K).
+  The feed list silently failed to load ("COULD NOT READ NEWSIIE.FEEDS,
+  ERROR $00"). The C stack went from 1K to 768 bytes (the deepest call
+  chain uses about 150), and **tools/memcheck.py now fails the build** if
+  the heap below the stack is under 1,295 bytes. It stands at 1,351: main
+  memory is effectively full, and the next feature needs a lever from
+  section 5 first.

@@ -25,7 +25,9 @@
 #define FEED_RDF        3
 #define FEED_NOT        4   /* the root is something else: HTML, say */
 
-/* Caps on what is kept per item, after cleaning. */
+/* Caps on what is kept per item, after cleaning. A title cut at its cap
+ * ends in "...", and a summary cut at its cap (or at the 3K captured
+ * before cleaning) ends with a paragraph saying it was shortened. */
 #define FEED_TITLE_MAX  160
 #define FEED_LINK_MAX   511     /* BBC links run past 400 with tracking */
 #define FEED_GUID_MAX   255

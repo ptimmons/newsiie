@@ -99,9 +99,12 @@ build/%.o: src/%.c $(HDRS) tools/cc65check.py | build build/asm
 build/%.o: src/%.s | build
 	$(CL65) -t $(TARGET) -c -o $@ $<
 
-$(BIN): $(call obj,$(APP) $(COMMON)) build/feeds.o $(CFG)
+# The app opens files, so the heap left below the stack must hold cc65's
+# 1K page-aligned ProDOS buffer: tools/memcheck.py fails the build if not.
+$(BIN): $(call obj,$(APP) $(COMMON)) build/feeds.o $(CFG) tools/memcheck.py
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/newsiie.map -Ln build/newsiie.lbl -o $@ $(call obj,$(APP) $(COMMON)) build/feeds.o
 	@echo "NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
+	@python3 -I tools/memcheck.py build/newsiie.map $(CFG) || { rm -f $@; exit 1; }
 
 
 $(PRBIN): $(call obj,$(PROBE) $(COMMON)) $(CFG)
