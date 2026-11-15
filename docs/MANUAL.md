@@ -2,7 +2,7 @@
 
 ### A News Reader for the Apple IIe
 
-#### User's Guide · Version 0.9
+#### User's Guide · Version 1.0
 
 ![The Newsiie title screen](images/title.png)
 

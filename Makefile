@@ -164,12 +164,14 @@ shots: $(SDISK) tools/shots.sh
 
 VERSION = $(shell sed -n 's/.*NEWSIIE_VERSION "\(.*\)".*/\1/p' src/ui.h)
 
-release: $(DISK) docs/MANUAL.md $(wildcard docs/images/*.png)
+release: $(DISK) docs/MANUAL.md LICENSE $(wildcard docs/images/*.png)
+	rm -rf build/release build/newsiie-$(VERSION).zip
 	mkdir -p build/release/images
 	cp $(DISK) build/release/newsiie-$(VERSION).po
 	cp docs/MANUAL.md build/release/MANUAL.md
+	cp LICENSE build/release/LICENSE
 	cp docs/images/*.png build/release/images/
-	cd build/release && zip -q -X -r ../newsiie-$(VERSION).zip newsiie-$(VERSION).po MANUAL.md images
+	cd build/release && zip -q -X -r ../newsiie-$(VERSION).zip newsiie-$(VERSION).po MANUAL.md LICENSE images
 	@echo "build/newsiie-$(VERSION).zip"
 
 run: $(DISK)

@@ -6,10 +6,13 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. Newsiie's code is its own.
 
-**Status:** all eight milestones are built; version 0.9. Milestones 0 to 5
-are verified on a real card; 6 to 8 are verified in Virtual ][ and wait on
-a real-card run before 1.0 (see section 9). `make release` builds
-`build/newsiie-0.9.zip`: the disk image and docs/MANUAL.md.
+**Status:** version 1.0. All eight milestones are built and have run on a
+real //e with a real card (section 9). Two things are not yet confirmed on
+hardware: the save retries added after 0.9's network-disk failures, and
+the waits for the network and clock right after power-on (the test //e
+boots from the CoGS network disk, so the card is up first). `make release`
+builds `build/newsiie-1.0.zip`: the disk image, docs/MANUAL.md and its
+pictures.
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -238,9 +241,9 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
 | 4 ✅ | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, real card ✅ |
 | 5 ✅ | Article screen: cleaning, UTF-8 folding, word wrap, paging | host tests ✅, Virtual ][ ✅, real card ✅ |
-| 6 ✅ (emulator) | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, real card pending |
-| 7 ✅ (emulator) | Live fetch wired in: progress, abort, error messages, refresh | Virtual ][ ✅ (disk feeds, no-card error); **real card pending** for the network waits and Esc while connecting |
-| 8 ✅ (emulator) | Read markers, save article, README and manual, release image | host tests ✅, Virtual ][ ✅, real card pending |
+| 6 ✅ | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, **real card ✅** (seven feeds load; an added feed survives a reboot on the network disk) |
+| 7 ✅ | Live fetch wired in: progress, abort, error messages, refresh | Virtual ][ ✅ (disk feeds, no-card error); **real card ✅** (all seven feeds, Slashdot shortened, Esc mid-NASA keeps what arrived, refresh); the power-on network and clock waits not exercised |
+| 8 ✅ | Read markers, save article, README and manual, release image | host tests ✅, Virtual ][ ✅, **real card**: read markers ✅ across a reboot; saving an article failed with $27 on the network disk, now retried (see "Saving on the network disk"), retry not yet re-run on the card |
 
 Milestones 1–2 and 3 are independent and could run in parallel.
 
