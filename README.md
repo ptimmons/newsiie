@@ -1,4 +1,4 @@
-# newsiie
+# Newsiie
 
 An RSS and Atom news reader for the Enhanced Apple //e, with the network
 done by a [CoGS](https://a2cogs.com) card. Written in cc65 C with ca65
@@ -11,7 +11,7 @@ of what you have read, and save articles for ZipEdit. See
 
 ## Checking a CoGS card
 
-The disk also carries two test programs. Quit newsiie with `Open-Apple-Q`
+The disk also carries two test programs. Quit Newsiie with `Open-Apple-Q`
 and choose one in the ProDOS selector.
 
 - `PROBE.SYSTEM` checks the card end to end on one screen: slot, firmware,
@@ -53,4 +53,4 @@ arrows scroll, `Space` pages, `Left` and `Right` step through items, `Esc`
 goes back. Anywhere: `Open-Apple-?` help, `Open-Apple-Q` quit.
 
 The feed list is the text file `NEWSIIE.FEEDS`, one `Name|URL` a line;
-edit it in newsiie or in ZipEdit.
+edit it in Newsiie or in ZipEdit.

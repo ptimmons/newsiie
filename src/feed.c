@@ -114,7 +114,7 @@ static void start_item(uint8_t depth)
 }
 
 /* A summary cut at a cap says so, as its own last paragraph. */
-static const char cut_note[] = "\n[Shortened: too long for newsiie to show in full.]";
+static const char cut_note[] = "\n[Shortened: too long for Newsiie to show in full.]";
 #define CUT_LEN     (sizeof cut_note - 1)
 
 static uint16_t mark_cut(uint16_t n)

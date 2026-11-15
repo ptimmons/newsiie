@@ -1,5 +1,5 @@
-# newsiie feeds: one a line, a name, a '|', then the URL.
-# Add and delete them in newsiie with Open-Apple-A and Open-Apple-D,
+# Newsiie feeds: one a line, a name, a '|', then the URL.
+# Add and delete them in Newsiie with Open-Apple-A and Open-Apple-D,
 # or edit this file. Comments like these are not kept.
 Hacker News|https://hnrss.org/frontpage
 BBC News|https://feeds.bbci.co.uk/news/rss.xml

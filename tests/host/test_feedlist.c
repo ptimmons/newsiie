@@ -37,6 +37,22 @@ static int parse(const char *line)
     return fl_parse(line, (uint16_t)strlen(line), name, url);
 }
 
+/* A save that answers from a script, for io_retry. */
+static const uint8_t *answers;
+static int calls;
+
+static uint8_t scripted(void)
+{
+    return answers[calls++];
+}
+
+static uint8_t retried(const uint8_t *script)
+{
+    answers = script;
+    calls = 0;
+    return io_retry(scripted);
+}
+
 int main(void)
 {
     FILE *f;
@@ -127,6 +143,24 @@ int main(void)
     fclose(f);
     CHECK(fl_load() == 0 && fl_count == FL_MAX && fl_skipped == 1 + 3);
     unlink(FL_FILE);
+
+    /* io_retry: a $27 is tried again, up to IO_TRIES in all; anything else
+     * is the answer at once. */
+    {
+        static const uint8_t ok[] = { 0 };
+        static const uint8_t once[] = { 0x27, 0 };
+        static const uint8_t twice[] = { 0x27, 0x27, 0 };
+        static const uint8_t always[] = { 0x27, 0x27, 0x27, 0 };
+        static const uint8_t locked[] = { 0x2B, 0 };
+        static const uint8_t other[] = { 0x27, 0x48, 0 };
+
+        CHECK(retried(ok) == 0 && calls == 1);
+        CHECK(retried(once) == 0 && calls == 2);
+        CHECK(retried(twice) == 0 && calls == 3);
+        CHECK(retried(always) == 0x27 && calls == IO_TRIES);
+        CHECK(retried(locked) == 0x2B && calls == 1);
+        CHECK(retried(other) == 0x48 && calls == 2);
+    }
 
     CHECK(out_of_bounds == 0);
 

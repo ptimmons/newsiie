@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "readset.h"
+#include "feedlist.h"               /* io_retry */
 
 #ifdef __CC65__
 #include <apple2.h>                 /* _filetype, _auxtype, _oserror */
@@ -59,37 +60,41 @@ void rs_load(void)
     rs_count = n > 0 ? (uint16_t)n / 2 : 0;
 }
 
-uint8_t rs_save(void)
+/* One attempt: 0, or the ProDOS error. */
+static uint8_t rs_write(void)
 {
     int fd, n;
 
-    if (!dirty || locked) {
-        return 0;
-    }
 #ifdef __CC65__
     _filetype = 0x06;               /* BIN */
     _auxtype = 0;
 #endif
     fd = open(RS_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0) {
-#ifdef __CC65__
-        if (_oserror == 0x2B) {
-            locked = 1;             /* write-protected: stop trying */
+    if (fd >= 0) {
+        n = write(fd, set, rs_count * 2);
+        if (!close(fd) && n == (int)(rs_count * 2)) {
+            return 0;
         }
-        return _oserror ? _oserror : 0xFF;
-#else
-        return 0xFF;
-#endif
     }
-    n = write(fd, set, rs_count * 2);
-    close(fd);
-    if (n != (int)(rs_count * 2)) {
 #ifdef __CC65__
-        return _oserror ? _oserror : 0xFF;
+    return _oserror ? _oserror : 0xFF;
 #else
-        return 0xFF;
+    return 0xFF;
 #endif
+}
+
+uint8_t rs_save(void)
+{
+    uint8_t rc;
+
+    if (!dirty || locked) {
+        return 0;
     }
-    dirty = 0;
-    return 0;
+    rc = io_retry(rs_write);
+    if (rc == 0x2B) {
+        locked = 1;                 /* write-protected: stop trying */
+    } else if (!rc) {
+        dirty = 0;
+    }
+    return rc;
 }

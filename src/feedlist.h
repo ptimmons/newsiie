@@ -42,6 +42,16 @@ extern char fl_url[FL_URL + 1];
 
 uint8_t fl_load(void);
 uint8_t fl_save(void);
+
+/* Every save goes through this. On a CoGS network disk each block written
+ * is an HTTP PUT, and the slot ROM's wait for the reply is bounded: a slow
+ * one comes back as $27, I/O error, and unlike a read the ROM does not
+ * retry it. fn writes a whole file and returns 0 or a ProDOS error; a $27
+ * is tried again, from the start, after a second's pause, up to IO_TRIES
+ * times in all. */
+#define IO_TRIES    3
+#define IO_ERR      0x27
+uint8_t io_retry(uint8_t (*fn)(void));
 extern uint8_t fl_oserror;          /* the ProDOS error behind FL_E_* */
 
 void fl_get(uint8_t i);

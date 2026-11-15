@@ -150,7 +150,7 @@ static void show_ping(void)
     p = fmt_str(p, ", protocol $");
     p = fmt_hex8(p, pg.proto);
     if (pg.fw_major < 1 || (pg.fw_major == 1 && pg.fw_minor < 39)) {
-        fmt_str(p, "  (older than 1.39, which newsiie targets)");
+        fmt_str(p, "  (older than 1.39, which Newsiie targets)");
     }
     say("Firmware", buf);
 
@@ -316,8 +316,8 @@ int main(void)
 
     lb_clear(SC_SPACE);
     lb_text(1, "CoGS probe", 0);
-    lb_text((uint8_t)(SCR_COLS - 1 - txt_len("newsiie " NEWSIIE_VERSION)),
-            "newsiie " NEWSIIE_VERSION, 0);
+    lb_text((uint8_t)(SCR_COLS - 1 - txt_len("Newsiie " NEWSIIE_VERSION)),
+            "Newsiie " NEWSIIE_VERSION, 0);
     scr_blit(0);
     lb_clear(has_mousetext ? MT_RULE : SC_DASH);
     scr_blit(1);

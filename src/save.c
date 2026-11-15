@@ -20,6 +20,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "save.h"
+#include "feedlist.h"               /* io_retry */
 
 #ifdef __CC65__
 #include <apple2.h>                 /* _filetype, _auxtype */
@@ -29,12 +30,22 @@ void lc_ram(void);                  /* blit.s */
 #endif
 
 static int fd;
-static uint8_t failed;
+static uint8_t failed;              /* 0, or the first ProDOS error */
+
+/* The error behind a failed call; $FF if ProDOS gave none. */
+static uint8_t os_err(void)
+{
+#ifdef __CC65__
+    return _oserror ? _oserror : 0xFF;
+#else
+    return 0xFF;
+#endif
+}
 
 static void put(const char *s, uint16_t n)
 {
     if (!failed && n && write(fd, s, n) != (int)n) {
-        failed = 1;
+        failed = os_err();
     }
 }
 
@@ -76,59 +87,64 @@ uint8_t save_exists(const char *name)
     return (uint8_t)(f >= 0);
 }
 
-uint8_t save_markdown(const char *name, const char *title, const char *date,
-                      const char *link, const char *body, uint16_t n)
+/* The article being saved, for each attempt. */
+static const char *s_name, *s_title, *s_date, *s_link, *s_body;
+static uint16_t s_n;
+
+/* One attempt: 0, or the ProDOS error. */
+static uint8_t write_md(void)
 {
     uint16_t i, start;
-    uint8_t rc = 0;
 
 #ifdef __CC65__
     _filetype = 0x04;               /* TXT */
     _auxtype = 0;
 #endif
     failed = 0;
-    fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    fd = open(s_name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
-#ifdef __CC65__
-        rc = _oserror ? _oserror : 0xFF;
-#else
-        rc = 0xFF;
-#endif
-        lc_ram();
-        return rc;
+        return os_err();
     }
     put("# ", 2);
-    puts_cr(title);
+    puts_cr(s_title);
     put("\r", 1);
-    if (*date) {
-        puts_cr(date);
+    if (*s_date) {
+        puts_cr(s_date);
     }
-    if (*link) {
-        puts_cr(link);
+    if (*s_link) {
+        puts_cr(s_link);
     }
     put("\r", 1);
     /* Paragraphs ('\n') get a blank line between them; a line break inside
      * one (an HTML <br>, '\r') is a plain new line. */
-    for (start = i = 0; i <= n; ++i) {
-        if (i == n || body[i] == '\n' || body[i] == '\r') {
-            put(body + start, (uint16_t)(i - start));
-            if (i < n) {
-                put(body[i] == '\n' ? "\r\r" : "\r", body[i] == '\n' ? 2 : 1);
+    for (start = i = 0; i <= s_n; ++i) {
+        if (i == s_n || s_body[i] == '\n' || s_body[i] == '\r') {
+            put(s_body + start, (uint16_t)(i - start));
+            if (i < s_n) {
+                put("\r\r", s_body[i] == '\n' ? 2 : 1);
             }
             start = (uint16_t)(i + 1);
         }
     }
     put("\r", 1);
-    if (failed) {
-#ifdef __CC65__
-        rc = _oserror ? _oserror : 0xFF;
-#else
-        rc = 0xFF;
-#endif
+    if (close(fd) && !failed) {
+        failed = os_err();
     }
-    if (close(fd) && !rc) {
-        rc = 0xFF;
-    }
+    return failed;
+}
+
+uint8_t save_markdown(const char *name, const char *title, const char *date,
+                      const char *link, const char *body, uint16_t n)
+{
+    uint8_t rc;
+
+    s_name = name;
+    s_title = title;
+    s_date = date;
+    s_link = link;
+    s_body = body;
+    s_n = n;
+    rc = io_retry(write_md);
     lc_ram();
     return rc;
 }

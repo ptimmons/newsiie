@@ -16,7 +16,6 @@ void splash_show(void)
     row_center(8, " NEWSIIE ", 1);
     row_center(9, "         ", 1);
     row_center(11, "A news reader for the Apple //e", 0);
-    row_center(13, "RSS and Atom feeds, fetched by the CoGS card", 0);
     row_center(17, "Version " NEWSIIE_VERSION, 0);
     status_msg("PRESS ANY KEY");
 }

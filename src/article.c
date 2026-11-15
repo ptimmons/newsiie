@@ -166,6 +166,11 @@ static void save(void)
         draw_status();
         return;
     }
+    for (p = fname; *p; ++p) {      /* ProDOS 8 wants names in uppercase */
+        if (*p >= 'a' && *p <= 'z') {
+            *p = (char)(*p - 32);
+        }
+    }
     if (save_exists(fname)) {
         p = fmt_str(fmt_str(note, "REPLACE "), fname);
         fmt_str(p, "?");
@@ -186,6 +191,8 @@ static void save(void)
         fmt_str(note + 9, fname);
     } else if (rc == 0x2B) {
         fmt_str(note, "THE DISK IS WRITE-PROTECTED");
+    } else if (rc == 0x27) {
+        fmt_str(note, "THE DISK FAILED TO SAVE IT (I/O ERROR $27): TRY AGAIN");
     } else {
         fmt_hex8(fmt_str(note, "COULD NOT SAVE, PRODOS ERROR $"), rc);
     }

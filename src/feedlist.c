@@ -10,6 +10,7 @@
 
 #ifdef __CC65__
 #include <apple2.h>                 /* _filetype, _auxtype */
+#include "tick.h"                   /* io_retry's pause */
 #endif
 
 void __fastcall__ aux_put(uint16_t aux_dst, const void *src, uint16_t n);
@@ -25,8 +26,8 @@ char    fl_name[FL_NAME + 1];
 char    fl_url[FL_URL + 1];
 
 static const char header[] =
-    "# newsiie feeds: one a line, a name, a '|', then the URL.\r"
-    "# Add and delete them in newsiie with Open-Apple-A and Open-Apple-D,\r"
+    "# Newsiie feeds: one a line, a name, a '|', then the URL.\r"
+    "# Add and delete them in Newsiie with Open-Apple-A and Open-Apple-D,\r"
     "# or edit this file. Comments like these are not kept.\r";
 
 static uint16_t entry(uint8_t i)
@@ -193,7 +194,20 @@ uint8_t fl_load(void)
     return 0;
 }
 
-uint8_t fl_save(void)
+uint8_t io_retry(uint8_t (*fn)(void))
+{
+    uint8_t rc, n = IO_TRIES;
+
+    while ((rc = fn()) == IO_ERR && --n) {
+#ifdef __CC65__
+        tick_wait(TICKS_PER_SEC);
+#endif
+    }
+    return rc;
+}
+
+/* One attempt: 0, or the ProDOS error (also in fl_oserror). */
+static uint8_t fl_write(void)
 {
     uint16_t n;
     uint8_t i, l;
@@ -220,22 +234,29 @@ uint8_t fl_save(void)
 #endif
     fd = open(FL_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (fd < 0) {
-#ifdef __CC65__
-        fl_oserror = _oserror;
-#endif
-        return fl_oserror == 0x2B ? FL_E_LOCKED : FL_E_WRITE;
+        goto failed;
     }
     rc = write(fd, SCRATCH, n);
+    if (rc != (int)n) {
+        close(fd);
+        goto failed;
+    }
+    if (!close(fd)) {
+        return 0;
+    }
+failed:
 #ifdef __CC65__
-    if (rc != (int)n) {
-        fl_oserror = _oserror;
-    }
+    fl_oserror = _oserror;
 #endif
-    if (close(fd) && !fl_oserror) {
-        rc = -1;
+    if (!fl_oserror) {
+        fl_oserror = 0xFF;          /* failed, but ProDOS gave no reason */
     }
-    if (rc != (int)n) {
-        return fl_oserror == 0x2B ? FL_E_LOCKED : FL_E_WRITE;
-    }
-    return 0;
+    return fl_oserror;
+}
+
+uint8_t fl_save(void)
+{
+    uint8_t rc = io_retry(fl_write);
+
+    return !rc ? 0 : rc == 0x2B ? FL_E_LOCKED : FL_E_WRITE;
 }

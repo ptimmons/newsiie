@@ -8,6 +8,10 @@
  *   - is the body plain XML, or did a server send gzip anyway?
  *   - does ProDOS still read the boot volume afterwards? On a CoGS network
  *     disk that read shares the card's FIFOs with the stream.
+ *   - W: does it write? Files of several sizes, under and over one 512-byte
+ *     block, written in pieces as newsiie saves an article, read back and
+ *     removed. Saving an article failed on the network disk with no ProDOS
+ *     error (0.9); this says at which step, and with what.
  *
  * Milestone 3 adds the feed parser: with P on (the default) every chunk
  * also goes through feed.c, and the report gives the item count, the
@@ -16,6 +20,9 @@
  * measures the parse rate.
  */
 #include <apple2.h>
+#include <peekpoke.h>
+#include <stdio.h>                  /* remove */
+#include <stdlib.h>                 /* _heapmemavail */
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -135,7 +142,7 @@ static void draw_menu(void)
     }
     row_text(MENU_ROW + 6, 4, "U", "type a URL      F  parse a feed file on disk (no card needed)", 0);
     row_text(MENU_ROW + 7, 4, "A", "run 1 to 6, then check the disk", 0);
-    row_text(MENU_ROW + 8, 4, "D", "check the disk: read the boot volume's directory block", 0);
+    row_text(MENU_ROW + 8, 4, "D", "check the disk: read the boot volume's directory block   W  write test", 0);
     p = fmt_str(fmt_u32(fmt_str(buf, "read size "), chunk_max), "      P  parse while fetching: ");
     fmt_str(p, parse_on ? "ON" : "OFF (raw transfer only)");
     row_text(MENU_ROW + 9, 4, "C", buf, 0);
@@ -425,7 +432,7 @@ static const char *content_kind(void)
     const char *p = preview;
 
     if (npreview >= 2 && (uint8_t)p[0] == 0x1F && (uint8_t)p[1] == 0x8B) {
-        return "GZIP-COMPRESSED: newsiie could not read this";
+        return "GZIP-COMPRESSED: Newsiie could not read this";
     }
     if (npreview >= 3 && (uint8_t)p[0] == 0xEF && (uint8_t)p[1] == 0xBB && (uint8_t)p[2] == 0xBF) {
         p += 3;
@@ -657,6 +664,125 @@ static void disk_check(void)
     row_text(DISK_ROW, VAL_COL, "Disk", buf, 0);
 }
 
+/* ---- W: the write test ---- */
+
+static const uint16_t wsizes[] = { 200, 512, 513, 1100, 2600, 6000 };
+#define NWSIZES (sizeof wsizes / sizeof wsizes[0])
+
+static char *fmt_err(char *p, uint8_t os, int en)
+{
+    p = fmt_hex8(fmt_str(p, ", ProDOS $"), os);
+    return fmt_u32(fmt_str(p, ", errno "), (uint32_t)en);
+}
+
+static void write_one(uint8_t i)
+{
+    static char name[8];
+    static int fd, n, en;
+    static uint16_t done, want, piece;
+    static uint8_t os, bad;
+    static char *p;
+
+    memcpy(name, "WTEST.1", 8);
+    name[6] = (char)('1' + i);
+    want = wsizes[i];
+    done = 0;
+    bad = 0;
+    p = fmt_str(fmt_u32(buf, want), " bytes: ");
+
+    _filetype = 0x04;               /* TXT, as newsiie saves */
+    _auxtype = 0;
+    _oserror = 0;
+    errno = 0;
+    fd = open(name, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        os = _oserror;
+        en = errno;
+        fmt_err(fmt_str(p, "OPEN FAILED"), os, en);
+        row_text((uint8_t)(DETAIL_ROW + 1 + i), VAL_COL, name, buf, 1);
+        return;
+    }
+    while (done < want) {
+        piece = (uint16_t)(want - done);
+        if (piece > 75) {
+            piece = 75;
+        }
+        _oserror = 0;
+        errno = 0;
+        n = write(fd, block, piece);
+        if (n != (int)piece) {
+            os = _oserror;
+            en = errno;
+            p = fmt_u32(fmt_str(p, "WRITE FAILED at "), done);
+            p = fmt_err(fmt_u32(fmt_str(p, ", returned "), (uint32_t)(uint16_t)n), os, en);
+            bad = 1;
+            break;
+        }
+        done += piece;
+    }
+    _oserror = 0;
+    errno = 0;
+    if (close(fd)) {
+        os = _oserror;
+        en = errno;
+        p = fmt_err(fmt_str(p, bad ? "; CLOSE FAILED" : "CLOSE FAILED"), os, en);
+        bad = 1;
+    }
+    if (!bad) {
+        /* Read it back: the size ProDOS kept. */
+        done = 0;
+        fd = open(name, O_RDONLY);
+        if (fd < 0) {
+            p = fmt_err(fmt_str(p, "WROTE, BUT REOPEN FAILED"), _oserror, errno);
+            bad = 1;
+        } else {
+            while ((n = read(fd, block, sizeof block)) > 0) {
+                done += (uint16_t)n;
+            }
+            close(fd);
+            if (done != want) {
+                p = fmt_u32(fmt_str(p, "WROTE, BUT READ BACK "), done);
+                bad = 1;
+            } else {
+                p = fmt_str(p, "OK, read back");
+            }
+        }
+    }
+    _oserror = 0;
+    if (remove(name)) {
+        p = fmt_hex8(fmt_str(p, "; not removed, ProDOS $"), _oserror);
+    }
+    row_text((uint8_t)(DETAIL_ROW + 1 + i), VAL_COL, name, buf, bad);
+}
+
+static void write_test(void)
+{
+    uint16_t j;
+    uint8_t i;
+    char *p;
+
+    for (j = 0; j < sizeof block; ++j) {
+        block[j] = (uint8_t)('A' + j % 26);
+    }
+    /* What cc65's startup saw: it takes the top of memory from $BF00 only
+     * if the system bit map protects exactly the global page ($BF6F = 1);
+     * otherwise from HIMEM at $73. A network-disk driver below $BF00 would
+     * change that, and with it the room for file buffers. */
+    p = fmt_hex8(fmt_str(buf, "$BF6F=$"), PEEK(0xBF6F));
+    p = fmt_hex8(fmt_hex8(fmt_str(p, " HIMEM=$"), PEEK(0x74)), PEEK(0x73));
+    p = fmt_u32(fmt_str(p, " heap free "), _heapmemavail());
+    fmt_u32(fmt_str(p, ", largest "), _heapmaxavail());
+    row_text(DETAIL_ROW, VAL_COL, "Memory", buf, 0);
+    for (i = 0; i < NWSIZES; ++i) {
+        row_text((uint8_t)(DETAIL_ROW + 1 + i), VAL_COL, "", "", 0);
+    }
+    for (i = 0; i < NWSIZES; ++i) {
+        write_one(i);
+    }
+    row_text(DETAIL_ROW + 1 + NWSIZES, VAL_COL, "", "", 0);
+    row_text(DETAIL_ROW + 2 + NWSIZES, VAL_COL, "", "", 0);
+}
+
 static void run_test(uint8_t i)
 {
     put_result((uint8_t)(MENU_ROW + i), "...", 0);
@@ -712,8 +838,8 @@ int main(void)
 
     lb_clear(SC_SPACE);
     lb_text(1, "Fetch probe", 0);
-    lb_text((uint8_t)(SCR_COLS - 1 - txt_len("newsiie " NEWSIIE_VERSION)),
-            "newsiie " NEWSIIE_VERSION, 0);
+    lb_text((uint8_t)(SCR_COLS - 1 - txt_len("Newsiie " NEWSIIE_VERSION)),
+            "Newsiie " NEWSIIE_VERSION, 0);
     scr_blit(0);
     lb_clear(has_mousetext ? MT_RULE : SC_DASH);
     scr_blit(1);
@@ -732,7 +858,7 @@ int main(void)
     }
 
     for (;;) {
-        status("PRESS 1-6, U, F, A, D, C, P   ESC QUITS");
+        status("PRESS 1-6, U, F, A, D, W, C, P   ESC QUITS");
         k = key_get();
         if (k >= 'a' && k <= 'z') {
             k = (uint8_t)(k - 32);
@@ -740,7 +866,7 @@ int main(void)
         if (k == K_ESC) {
             break;
         }
-        if (!card && k != 'D' && k != 'C' && k != 'F' && k != 'P') {
+        if (!card && k != 'D' && k != 'C' && k != 'F' && k != 'P' && k != 'W') {
             continue;
         }
         if (k >= '1' && k < '1' + NTESTS) {
@@ -751,6 +877,8 @@ int main(void)
             }
         } else if (k == 'D') {
             disk_check();
+        } else if (k == 'W') {
+            write_test();
         } else if (k == 'C') {
             chunk_max = chunk_max >= READ_MAX ? 512 : (uint16_t)(chunk_max * 2);
             draw_menu();

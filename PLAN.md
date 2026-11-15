@@ -1,10 +1,10 @@
-# newsiie — implementation plan
+# Newsiie — implementation plan
 
 An RSS/Atom news reader for the Enhanced Apple //e with a CoGS card.
 
 ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
-screen. newsiie's code is its own.
+screen. Newsiie's code is its own.
 
 **Status:** all eight milestones are built; version 0.9. Milestones 0 to 5
 are verified on a real card; 6 to 8 are verified in Virtual ][ and wait on
@@ -28,8 +28,8 @@ code in `~/repos/a2chat` and `~/repos/smbget`.
 
 ### Booting from the CoGS network disk
 
-This is how newsiie is meant to be run, so it is a design rule, not a
-caveat. The card's disk driver and newsiie share one pair of FIFOs, and the
+This is how Newsiie is meant to be run, so it is a design rule, not a
+caveat. The card's disk driver and Newsiie share one pair of FIFOs, and the
 slot ROM, while it waits for a block, discards any frame that is not its
 reply. So:
 
@@ -42,17 +42,24 @@ reply. So:
    the `HTTP` fallback is ever needed, it runs without `STREAM` and is fully
    drained before any disk call.
 3. **No soft reset.** `cogs_open` resets only the frame parser and FIFOs.
-   Verified on the real card: after newsiie and the probe each did so, ProDOS
+   Verified on the real card: after Newsiie and the probe each did so, ProDOS
    went on loading programs from the network disk.
 4. **The volume may be read-only.** Writes to a network disk are HTTP PUTs
    to the image's origin. The CoGS Image Manager share accepts them;
    GitHub, the Internet Archive and the a2cogs catalog do not, and the
-   card then reports the disk write-protected (`$2B`). newsiie must treat
+   card then reports the disk write-protected (`$2B`). Newsiie must treat
    that as a normal state: keep the feed list in memory, say
    `DISK IS WRITE-PROTECTED: FEEDS NOT SAVED` once, and carry on.
 5. **Disk I/O is network I/O.** Every block costs a round trip unless it is
    in the card's cache, so files stay small and are read and written whole,
    once, rather than block by block during use.
+6. **A block write can fail with $27.** Each block written is an HTTP PUT,
+   and the slot ROM's wait for the `$D7` reply is bounded; reads are retried
+   up to eight times, writes are not (Technical Reference rev 36, 6.3.2).
+   Measured on the real card (FETCH's W test, 0.9): files of one block
+   always saved, larger ones failed at random steps, with $27. Every save
+   goes through `io_retry()` (feedlist.c): a $27 rewrites the whole file,
+   after a second's pause, up to three times in all.
 
 Not in v1: Uthernet II, the ][+ / 40 columns, fetching the linked web page,
 images, podcasts, OPML. Screen columns live in named constants, so 40
@@ -101,7 +108,7 @@ loops, which is why they are assembly.
 | `prodos.c` — feeds file, save article | C | a2chat's MLI wrapper, trimmed |
 
 Build and emulator tooling (`tools/bootstrap.sh`, `mkdisk.sh`, `vii.sh`) is
-newsiie's own, written with the Virtual ][ pitfalls ZipEdit documented in
+Newsiie's own, written with the Virtual ][ pitfalls ZipEdit documented in
 mind (eject before rebuilding a mounted image, set keyboard delay after
 restart, verify the image carries the binary).
 
@@ -295,7 +302,7 @@ Milestones 1–2 and 3 are independent and could run in parallel.
   reply, replies longer and shorter than expected, an unknown opcode, a
   reply cut off partway, no reply at all, a stray byte, and the number and
   date formatters against Python's `datetime`.
-- **The probe** is `PROBE.SYSTEM` on the same disk: quit newsiie with
+- **The probe** is `PROBE.SYSTEM` on the same disk: quit Newsiie with
   `OA-Q` and pick it in the ProDOS selector. It scans the slots, resets
   the card, PINGs, waits up to 20 s for a link, reads `STATUS`, `TIME`
   and `LOCALTIME`, checks data both ways (eight 255-byte `RANDOM`
@@ -391,7 +398,7 @@ Milestones 1–2 and 3 are independent and could run in parallel.
 - Not explained: on the first run the 404's open succeeded and its first
   read failed; on the second it was refused at open. The fixes changed
   only the waiting, so the card or httpbin may have answered differently.
-  newsiie handles both.
+  Newsiie handles both.
 
 ### Risks settled by milestone 2
 
@@ -627,11 +634,11 @@ This milestone added what a live network needs:
 ### Limits, made visible and documented (after 0.9)
 
 - **Every limit is now in the manual** (Appendix D, with a table of each
-  limit and what happens at it, and a list of what newsiie does not do),
+  limit and what happens at it, and a list of what Newsiie does not do),
   with notes where the reader meets them and every message in Appendix B.
 - **No more silent truncation:** a summary cut at 2,000 characters (or at
   the 3K captured before cleaning) ends on a word with "[Shortened: too
-  long for newsiie to show in full.]"; a headline cut at 160 ends in
+  long for Newsiie to show in full.]"; a headline cut at 160 ends in
   "..."; an article past the 140-line wrap table says "[Too long to show
   in full.]"; lines of NEWSIIE.FEEDS that cannot be used (no address, one
   past 127 characters, a feed past the 21st) are counted and reported at
@@ -648,3 +655,24 @@ This milestone added what a live network needs:
   the heap below the stack is under 1,295 bytes. It stands at 1,351: main
   memory is effectively full, and the next feature needs a lever from
   section 5 first.
+
+### Saving on the network disk (after 0.9)
+
+- **Real-card test:** the feed list and read markers saved, but saving an
+  article said "COULD NOT SAVE, PRODOS ERROR $FF". FETCH.SYSTEM gained a
+  **W** write test (six files, 200 to 6,000 bytes, written in pieces as
+  Newsiie does, read back, removed). On the real card, 200 and 512 bytes
+  passed every time; 513 and up failed at random steps (open, write, close,
+  reopen) with $27, I/O error, before and after a fetch. In the emulator
+  all pass. The cause is the card's (section 1, rule 6), not Newsiie's.
+- **$FF was Newsiie's:** a failed close() was reported without its
+  _oserror. Every save now reports the real code, and the article's $27
+  has its own message.
+- **Retries:** `io_retry()` wraps the article, feed list and read-set
+  saves. Host tests cover it (45 feed-list checks).
+- **Memory:** the retry code cost ~170 bytes of main memory. The C stack
+  was filled with $A5 and measured in the emulator: 84 bytes deep at most
+  through fetching, reading, saving with replace, and saving the read set.
+  It went from 768 to 512 bytes; the heap stands at 1,434 (1,295 needed).
+- **Lowercase names:** a name typed at SAVE AS with lowercase letters gave
+  $40 (ProDOS 2.4 wants uppercase). The Article view now uppercases it.
