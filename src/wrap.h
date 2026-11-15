@@ -10,7 +10,7 @@
 
 #include "port.h"
 
-#define WRAP_MAX    200             /* lines kept; more are dropped */
+#define WRAP_MAX    160             /* lines kept; more are dropped */
 
 #define WK_TEXT     0
 #define WK_RULE     1               /* a horizontal rule, no text */

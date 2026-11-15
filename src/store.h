@@ -1,7 +1,7 @@
 /*
  * The item store: one feed's items, in auxiliary memory.
  *
- * Records are packed one after another in aux $0800-$BFFF (47K), and a
+ * Records are packed one after another in aux $0800-$AFFF (42K), and a
  * small index in main memory holds where each starts. Items are added as
  * the parser closes them and the store is cleared before each fetch, so
  * there is no deletion and no fragmentation. When the next item would not
@@ -22,7 +22,12 @@
 #include "port.h"
 #include "feed.h"
 
-#define STORE_MAX_ITEMS 200
+#define STORE_MAX_ITEMS 160
+
+/* aux memory the store owns. Above it, $B000-$BFFF, is the feed list
+ * (feedlist.h); at $C000 and up is I/O, never to be read. */
+#define STORE_BASE      0x0800
+#define STORE_END       0xB000
 #define STORE_READ      0x01
 
 /* What a list row needs, read back from aux in one copy. */

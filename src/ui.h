@@ -44,6 +44,12 @@ extern uint8_t     heads_fresh;
 void status_main(const char *left, const char *mid);
 void status_msg(const char *msg);
 
+/* Ask on the status bar. prompt() edits buf (up to max characters) and
+ * returns 1 on Return with something typed, 0 on Esc. confirm() asks a
+ * yes-or-no question and returns 1 for Y. */
+uint8_t prompt(const char *label, char *buf, uint8_t max);
+uint8_t confirm(const char *question);
+
 /* A bar with three fields of the caller's choosing (the probes'). */
 void status_fields(const char *left, const char *mid, const char *right);
 

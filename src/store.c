@@ -9,8 +9,8 @@ void aux_init(void);
 void __fastcall__ aux_put(uint16_t aux_dst, const void *src, uint16_t n);
 void __fastcall__ aux_get(void *dst, uint16_t aux_src, uint16_t n);
 
-#define AUX_BASE    0x0800
-#define AUX_END     0xC000      /* never read at or past this: it is I/O */
+#define AUX_BASE    STORE_BASE
+#define AUX_END     STORE_END
 #define HEAD_MAX    (6 + FEED_TITLE_MAX + 1 + 16)
 
 uint16_t store_count;

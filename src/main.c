@@ -7,7 +7,12 @@
 #include "screen.h"
 #include "kbd.h"
 #include "store.h"
+#include "feedlist.h"
+#include "fmt.h"
 #include "ui.h"
+
+extern const char *feeds_note;
+static char note[40];
 
 /* Before the 80-column screen is known to exist: a message on the
  * 40-column screen, written straight to page 1. */
@@ -41,6 +46,11 @@ int main(void)
         key_get();
         scr_done();
         return 1;
+    }
+    /* The feed list, before anything can open a stream. */
+    if (fl_load() == FL_E_READ) {
+        fmt_hex8(fmt_str(note, "COULD NOT READ NEWSIIE.FEEDS, ERROR $"), fl_oserror);
+        feeds_note = note;
     }
     net_check();                /* while the splash is up */
     key_get();                  /* consumed: it must not act on the view */

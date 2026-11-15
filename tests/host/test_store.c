@@ -1,7 +1,7 @@
 /*
  * Host tests for src/store.c, with auxiliary memory modelled as an array.
- * The model fails any access outside $0800-$BFFF: on the Apple a read at
- * $C000 and up would hit I/O switches.
+ * The model fails any access outside the store's aux, $0800-$AFFF: above
+ * it is the feed list, and at $C000 and up a read would hit I/O switches.
  */
 #include <stdio.h>
 #include <string.h>
@@ -15,7 +15,7 @@ static int out_of_bounds;
 
 static void bounds(uint16_t at, uint16_t n)
 {
-    if (at < 0x0800 || (uint32_t)at + n > 0xC000) {
+    if (at < STORE_BASE || (uint32_t)at + n > STORE_END) {
         ++out_of_bounds;
     }
 }
@@ -53,7 +53,7 @@ int main(void)
     unsigned i, k, n;
 
     CHECK(store_init() == 0);
-    CHECK(store_count == 0 && store_free() == 0xC000 - 0x0800);
+    CHECK(store_count == 0 && store_free() == STORE_END - STORE_BASE);
 
     /* Round trip: every field of every item comes back as it went in. */
     for (i = 0; i < 20; ++i) {
@@ -111,7 +111,11 @@ int main(void)
     }
     CHECK(store_count == STORE_MAX_ITEMS && store_full);
     store_head(STORE_MAX_ITEMS - 1, &h);
-    CHECK(!strcmp(h.title, "Item 199 title"));
+    {
+        char want[32];
+        snprintf(want, sizeof want, "Item %u title", STORE_MAX_ITEMS - 1);
+        CHECK(!strcmp(h.title, want));
+    }
 
     CHECK(out_of_bounds == 0);
 

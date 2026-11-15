@@ -1,0 +1,10 @@
+# newsiie feeds: one a line, a name, a '|', then the URL.
+# Add and delete them in newsiie with Open-Apple-A and Open-Apple-D,
+# or edit this file. Comments like these are not kept.
+Hacker News|https://hnrss.org/frontpage
+BBC News|https://feeds.bbci.co.uk/news/rss.xml
+Ars Technica|https://feeds.arstechnica.com/arstechnica/index
+NASA|https://www.nasa.gov/feed/
+New York Times|https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
+Slashdot|http://rss.slashdot.org/Slashdot/slashdotMain
+xkcd|https://xkcd.com/atom.xml

@@ -1,0 +1,13 @@
+# The test disk's feed list: feed files on the second disk (/FEEDS, from
+# make feedsdisk) first, so the emulator can drive every screen without a
+# card, then the network feeds the release ships with.
+Hacker News (disk)|/FEEDS/HN.XML
+Ars Technica (disk)|/FEEDS/ARS.XML
+BBC News (disk)|/FEEDS/BBC.XML
+xkcd (disk)|/FEEDS/XKCD.XML
+Long body (disk)|/FEEDS/CAPS.XML
+Formatting (disk)|/FEEDS/RSS2.XML
+Not there (disk)|/FEEDS/NONE.XML
+Hacker News|https://hnrss.org/frontpage
+BBC News|https://feeds.bbci.co.uk/news/rss.xml
+NASA|https://www.nasa.gov/feed/

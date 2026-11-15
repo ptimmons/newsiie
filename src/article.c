@@ -20,6 +20,13 @@
 #include "wrap.h"
 #include "ui.h"
 
+/* This file's code runs from the language card ($D400-$DFFF, bank 2),
+ * which cc65 fills at startup: main memory is full (PLAN.md section 5).
+ * Code there must not call ProDOS or the ROM while it runs. */
+#ifdef __CC65__
+#pragma code-name ("LC")
+#endif
+
 #define FIRST_ROW   2
 #define NROWS       (BODY_ROWS - FIRST_ROW)     /* 21 */
 #define TEXT_COL    1

@@ -6,9 +6,10 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestones 0 to 3 are done and verified on a real card, and
-milestone 4 (the item store and the Headlines view) is done in Virtual ][
-and waits on a real-card run (see section 9).
+**Status:** milestones 0 to 5 are done and verified on a real card;
+milestone 6 (the feed list, saved to NEWSIIE.FEEDS) is done in Virtual ][
+and waits on a real-card run (see section 9). Main memory is full: the
+language card now holds code (section 5).
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -230,7 +231,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
 | 4 ✅ | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, real card ✅ |
 | 5 ✅ | Article screen: cleaning, UTF-8 folding, word wrap, paging | host tests ✅, Virtual ][ ✅, real card ✅ |
-| 6 | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | suite |
+| 6 (built) | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, real card pending |
 | 7 | Live fetch wired in: progress, abort, error messages, refresh | **your card** |
 | 8 | Read markers, save article, README and manual, release image | suite + card |
 
@@ -511,3 +512,39 @@ Milestones 1–2 and 3 are independent and could run in parallel.
 - **Memory:** the app is 32K; BSS ends at `$AE8A`, about 2K below the
   stack. Milestone 6 (the feeds file) will need the levers in section 5.
 - **Real card:** milestones 4 and 5 run on the user's //e (2026-11-14).
+
+### Milestone 6 notes
+
+- **The feed list** (`feedlist.c`): up to 21 feeds (a screen of rows), in
+  aux `$B000-$BFFF` above the item store, which shrinks to `$0800-$AFFF`
+  (42K). `NEWSIIE.FEEDS` is a ProDOS TXT file, one `Name|URL` a line
+  (a bare URL is named after its host); comments and blank lines are read
+  and dropped, CR or LF endings both work. It is read once at startup,
+  before anything can open a stream, and written whole after each add or
+  delete, through the parser's idle 3K buffer. A write-protected disk
+  (`$2B`) is said once and the list kept in memory; other errors are shown
+  with their ProDOS code. A missing file is an empty list.
+- **Prompts** (`prompt.c`): a line editor on the status bar, a normal-video
+  box inside the inverse bar with a block cursor, scrolling to keep the end
+  in view; Return accepts, Esc cancels, Delete or Left erases. `confirm()`
+  asks Y or N. Open-Apple-A asks for a URL (`https://` is added if there
+  is no scheme), then a name (the host, editable); Open-Apple-D asks
+  before deleting.
+- **The disks:** the release disk ships `cfg/NEWSIIE.FEEDS` (seven feeds);
+  the test disk is now the same program with `tests/NEWSIIE.FEEDS`, which
+  adds the `/FEEDS` disk entries. The `NEWSIIE_TEST` build is gone.
+- **Memory, the first lever pulled:** the app overflowed by 1.3K and needs
+  about 1.3K of heap for ProDOS's file buffer. `article.c`, `wrap.c`,
+  `prompt.c` and `help.c` (2.6K) now run from the language card,
+  `$D400-$DFFF` bank 2, which cc65 fills at startup; the copy they load
+  from is overwritten by BSS. They call neither ProDOS nor the ROM, which
+  code there must not do. The store's index went to 160 items and the
+  wrap table to 160 lines. BSS now ends at `$B10E`: about 1.5K of heap.
+  The language card has about 400 bytes left.
+- **Tests:** 38 feed-list checks on the Mac, including a real save and load
+  and a Mac-made file with LF endings. In Virtual ][: the list loads from
+  the file; an article and help (both from the language card) work; a URL
+  typed without a scheme is added with the host as its name; delete asks
+  and removes; the saved file reads back as TXT with CR endings; no file
+  gives the empty list. Not checked: a write-protected disk.
+

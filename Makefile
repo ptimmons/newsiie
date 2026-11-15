@@ -38,8 +38,7 @@ PARSER = \
 	src/scan_tab.c \
 	src/scan.s
 
-# The app. feeds.c is built twice: the test build lists feed files on a
-# second disk as well, so the emulator, which has no card, can drive it.
+# The app. (feeds.c is named in the link rule.)
 APP = \
 	src/main.c \
 	src/splash.c \
@@ -49,6 +48,8 @@ APP = \
 	src/heads.c \
 	src/article.c \
 	src/wrap.c \
+	src/feedlist.c \
+	src/prompt.c \
 	src/store.c \
 	src/source.c \
 	src/auxmem.s \
@@ -66,7 +67,6 @@ obj = $(patsubst src/%.s,build/%.o,$(patsubst src/%.c,build/%.o,$(1)))
 HDRS = $(wildcard src/*.h)
 
 BIN   = build/NEWSIIE.SYSTEM
-TBIN  = build/test/NEWSIIE.SYSTEM
 TDISK = build/NEWSIIE-TEST.po
 PRBIN = build/PROBE.SYSTEM
 FTBIN = build/FETCH.SYSTEM
@@ -97,14 +97,6 @@ $(BIN): $(call obj,$(APP) $(COMMON)) build/feeds.o $(CFG)
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/newsiie.map -Ln build/newsiie.lbl -o $@ $(call obj,$(APP) $(COMMON)) build/feeds.o
 	@echo "NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
 
-build/test/feeds.o: src/feeds.c $(HDRS) tools/cc65check.py | build/test
-	$(CL65) -t $(TARGET) $(COPT) -DNEWSIIE_TEST -S -o build/test/feeds.s $<
-	python3 -I tools/cc65check.py build/test/feeds.s > /dev/null || python3 -I tools/cc65check.py build/test/feeds.s
-	$(CL65) -t $(TARGET) -c -o $@ build/test/feeds.s
-
-$(TBIN): $(call obj,$(APP) $(COMMON)) build/test/feeds.o $(CFG)
-	$(CL65) -t $(TARGET) -C $(CFG) -m build/test/newsiie.map -o $@ $(call obj,$(APP) $(COMMON)) build/test/feeds.o
-	@echo "NEWSIIE.SYSTEM (test): $$(($$(wc -c < $@) - 58)) bytes"
 
 $(PRBIN): $(call obj,$(PROBE) $(COMMON)) $(CFG)
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/probe.map -Ln build/probe.lbl -o $@ $(call obj,$(PROBE) $(COMMON))
@@ -117,14 +109,19 @@ $(FTBIN): $(call obj,$(FETCH) $(COMMON)) $(CFG)
 disk: $(DISK)
 
 # NEWSIIE.SYSTEM goes first, so it is the one ProDOS launches at boot.
-# The probes are launched from the quit selector.
-$(DISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh
+# The probes are launched from the quit selector. NEWSIIE.FEEDS is the
+# starting feed list, put on as a ProDOS text file (CR line endings).
+$(DISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh cfg/NEWSIIE.FEEDS
 	tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN) $(FTBIN)
+	tools/ac -ptx $(DISK) NEWSIIE.FEEDS < cfg/NEWSIIE.FEEDS
 
 testdisk: $(TDISK)
 
-$(TDISK): $(TBIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh
-	tools/mkdisk.sh $(TDISK) $(TBIN) $(PRBIN) $(FTBIN)
+# The same program, with a feed list that also reads feeds from the
+# second disk, /FEEDS, so the emulator, which has no card, can drive it.
+$(TDISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh tests/NEWSIIE.FEEDS
+	tools/mkdisk.sh $(TDISK) $(BIN) $(PRBIN) $(FTBIN)
+	tools/ac -ptx $(TDISK) NEWSIIE.FEEDS < tests/NEWSIIE.FEEDS
 
 # Four corpus feeds on a 140K disk named /FEEDS, for drive 2.
 feedsdisk: build/FEEDS.po
@@ -159,11 +156,15 @@ build/host/test_store: tests/host/test_store.c src/store.c $(HDRS) | build/host
 build/host/test_wrap: tests/host/test_wrap.c src/wrap.c $(HDRS) | build/host
 	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_wrap.c src/wrap.c
 
-host-test: build/host/test_cogs build/host/test_clean build/host/test_store build/host/test_wrap build/host/feeddump
+build/host/test_feedlist: tests/host/test_feedlist.c src/feedlist.c $(HDRS) | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_feedlist.c src/feedlist.c
+
+host-test: build/host/test_cogs build/host/test_clean build/host/test_store build/host/test_wrap build/host/test_feedlist build/host/feeddump
 	build/host/test_cogs
 	build/host/test_clean
 	build/host/test_store
 	build/host/test_wrap
+	mkdir -p build/host/fl && cd build/host/fl && ../test_feedlist
 	@fail=0; for f in $(FIXTURES); do \
 	    for c in 1 7 512; do \
 	        if ! build/host/feeddump -c $$c $$f | diff -u $${f%.xml}.out - ; then \

@@ -3,6 +3,13 @@
  */
 #include "wrap.h"
 
+/* This file's code runs from the language card ($D400-$DFFF, bank 2),
+ * which cc65 fills at startup: main memory is full (PLAN.md section 5).
+ * Code there must not call ProDOS or the ROM while it runs. */
+#ifdef __CC65__
+#pragma code-name ("LC")
+#endif
+
 wrap_line_t wrap_lines[WRAP_MAX];
 uint16_t    wrap_count;
 uint8_t     wrap_full;
