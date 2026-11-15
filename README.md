@@ -54,3 +54,9 @@ goes back. Anywhere: `Open-Apple-?` help, `Open-Apple-Q` quit.
 
 The feed list is the text file `NEWSIIE.FEEDS`, one `Name|URL` a line;
 edit it in Newsiie or in ZipEdit.
+
+## Contributing and license
+
+Bug reports, real-hardware test results and changes are welcome; see
+[CONTRIBUTING.md](CONTRIBUTING.md). Newsiie is released under the
+[MIT License](LICENSE).
