@@ -10,7 +10,7 @@
 #pragma code-name ("LC")
 #endif
 
-wrap_line_t wrap_lines[WRAP_MAX];
+wrap_line_t *wrap_lines;
 uint16_t    wrap_count;
 uint8_t     wrap_full;
 

@@ -7,9 +7,9 @@ screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
 **Status:** milestones 0 to 5 are done and verified on a real card;
-milestone 6 (the feed list, saved to NEWSIIE.FEEDS) is done in Virtual ][
-and waits on a real-card run (see section 9). Main memory is full: the
-language card now holds code (section 5).
+milestones 6 and 7 are done in Virtual ][ and wait on a real-card run (see
+section 9). Next is milestone 8. Main memory is full: the language card
+holds code and the C stack is 1K (section 5).
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -231,8 +231,8 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
 | 4 ✅ | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, real card ✅ |
 | 5 ✅ | Article screen: cleaning, UTF-8 folding, word wrap, paging | host tests ✅, Virtual ][ ✅, real card ✅ |
-| 6 (built) | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, real card pending |
-| 7 | Live fetch wired in: progress, abort, error messages, refresh | **your card** |
+| 6 ✅ (emulator) | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, real card pending |
+| 7 ✅ (emulator) | Live fetch wired in: progress, abort, error messages, refresh | Virtual ][ ✅ (disk feeds, no-card error); **real card pending** for the network waits and Esc while connecting |
 | 8 | Read markers, save article, README and manual, release image | suite + card |
 
 Milestones 1–2 and 3 are independent and could run in parallel.
@@ -547,4 +547,33 @@ Milestones 1–2 and 3 are independent and could run in parallel.
   typed without a scheme is added with the host as its name; delete asks
   and removes; the saved file reads back as TXT with CR endings; no file
   gives the empty list. Not checked: a write-protected disk.
+
+### Milestone 7 notes
+
+Fetching, progress (`FETCHING 37K, 12 ITEMS`), Esc during the transfer,
+error messages and Open-Apple-R were already in place from milestone 4.
+This milestone added what a live network needs:
+
+- **Ready checks** before a fetch: up to 20 s for the card's network link
+  (`WAITING FOR THE NETWORK`), and for an https URL up to 20 s for the
+  card's NTP clock, without which it refuses verified TLS (`WAITING FOR
+  THE CARD'S CLOCK`). Esc gives up; running out of time reports `NO
+  NETWORK` or `THE CARD'S CLOCK IS NOT SET, AND HTTPS NEEDS IT`. Both are
+  usual for a few seconds after power-on.
+- **Esc while connecting.** A wait for the server can no longer simply be
+  abandoned: the card would send its STREAM_OPEN reply later, and that
+  could be taken for the next open's. So Esc is noted (`STOPPING WHEN THE
+  SERVER ANSWERS`), the wait runs to the reply, and the fetch stops there.
+- **A summary** when the headlines open: `20 ITEMS, 74K IN 9 S` by the
+  card's clock, until the first key.
+- **The status bar's network field** is refreshed after every network
+  fetch, so a dropped link shows.
+- **Memory:** the C stack went from 2K to 1K (with static locals it holds
+  only arguments and temporaries), and the Article view's 140-line wrap
+  table moved into the parser's idle buffer, which it now fills exactly
+  (text 2001 + link 512 + table 560 = 3073). Main memory free went from
+  1.5K to about 2.3K after this milestone's own code.
+- **Checked in Virtual ][:** a disk feed opens with `20 ITEMS, 17K`; a
+  network feed with no card says `NO COGS CARD`. The network waits, Esc
+  while connecting and the timed summary need the real card.
 

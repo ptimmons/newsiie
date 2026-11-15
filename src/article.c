@@ -39,8 +39,11 @@ static uint16_t top;
 static char note[24];
 static char where[24];
 
+/* The parser's idle buffer, 3073 bytes: the text, the link, then the
+ * wrapped-line table (140 lines of 4 bytes). */
 #define BODY    feed_scratch
 #define LINK    (feed_scratch + FEED_BODY_MAX + 1)
+#define LINES   ((wrap_line_t *)(LINK + FEED_LINK_MAX + 1))
 
 static void compose(void)
 {
@@ -53,6 +56,7 @@ static void compose(void)
         LINK[WIDTH - 1] = '>';      /* cut: the rest is in the store */
     }
 
+    wrap_lines = LINES;
     wrap_reset();
     wrap_add(h.title, (uint16_t)strlen(h.title), WIDTH, 0);
     if (h.date[0]) {

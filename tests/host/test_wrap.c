@@ -12,6 +12,7 @@ static int fails, checks;
 #define CHECK(c) do { ++checks; if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); ++fails; } } while (0)
 
 static char joined[8192];
+static wrap_line_t table[WRAP_MAX];
 
 /* Lines rejoined: a space where a break replaced one, '\n' at blanks. */
 static const char *rejoin(void)
@@ -47,6 +48,8 @@ int main(void)
 {
     const char *t;
     uint16_t i;
+
+    wrap_lines = table;
 
     /* Short text: one line, untouched. */
     wrap_reset();

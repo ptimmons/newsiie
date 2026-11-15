@@ -95,6 +95,19 @@ static void move(uint16_t to)
     draw();
 }
 
+/* "20 ITEMS, 74K IN 9 S" on the status bar until the first key. */
+static void summary(void)
+{
+    char *p = fmt_u32(note, store_count);
+
+    p = fmt_str(p, store_count == 1 ? " ITEM, " : " ITEMS, ");
+    p = fmt_str(fmt_u32(p, (source_bytes + 512) >> 10), "K");
+    if (source_secs) {
+        fmt_str(fmt_u32(fmt_str(p, " IN "), source_secs), " S");
+    }
+    status_msg(note);
+}
+
 uint8_t heads_run(void)
 {
     uint8_t k, rc;
@@ -105,6 +118,8 @@ uint8_t heads_run(void)
         draw();
         if (source_rc) {
             status_msg(source_error(source_rc));
+        } else {
+            summary();
         }
     } else {
         /* Back from an article, maybe a different one (Left, Right). */
@@ -155,6 +170,8 @@ uint8_t heads_run(void)
             draw();
             if (rc) {
                 status_msg(source_error(rc));
+            } else {
+                summary();
             }
         } else {
             draw_status();          /* retire any message */

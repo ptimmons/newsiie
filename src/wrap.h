@@ -10,7 +10,7 @@
 
 #include "port.h"
 
-#define WRAP_MAX    160             /* lines kept; more are dropped */
+#define WRAP_MAX    140             /* lines kept; more are dropped */
 
 #define WK_TEXT     0
 #define WK_RULE     1               /* a horizontal rule, no text */
@@ -21,7 +21,9 @@ typedef struct {
     uint8_t     kind;
 } wrap_line_t;
 
-extern wrap_line_t wrap_lines[WRAP_MAX];
+/* The table: WRAP_MAX entries the caller provides (the Article view puts
+ * it in the parser's idle buffer, beside the text it points into). */
+extern wrap_line_t *wrap_lines;
 extern uint16_t    wrap_count;
 extern uint8_t     wrap_full;       /* lines were dropped */
 

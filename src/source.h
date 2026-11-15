@@ -17,6 +17,7 @@
 #define SRC_E_NOFILE    0xF8    /* the file would not open */
 #define SRC_E_NOTFEED   0xF9    /* it parsed, but it is not a feed */
 #define SRC_E_EMPTY     0xFA    /* a feed with no items */
+#define SRC_E_NOCLOCK   0xFB    /* https, but the card's clock is not set */
 
 /* Fetch url into the store (clearing it first). Returns 0, COGS_E_ABORT
  * (stopped, items so far kept), or an error. */
@@ -27,5 +28,7 @@ const char *source_error(uint8_t rc);
 
 extern uint32_t source_bytes;       /* bytes the last fetch read */
 extern uint8_t  source_rc;          /* what the last fetch returned */
+extern uint16_t source_secs;        /* how long it took, by the card's
+                                     * clock; 0 for a file or no clock */
 
 #endif
