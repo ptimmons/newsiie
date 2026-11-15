@@ -45,7 +45,9 @@ static const struct help_row rows[] = {
     { "",           "",              "ANYWHERE",   0 },
     { "HEADLINES",  0,               OA "-?",      "this help" },
     { "Up Down",    "choose",        OA "-Q",      "quit" },
-    { "Return",     "read it",       "Esc",        "stop a fetch" },
+    { OA "-Up Dn",  "page",          "Esc",        "stop a fetch" },
+    { OA "-< >",    "first, last",   "",           "" },
+    { "Return",     "read it",       "",           "" },
     { OA "-R",      "refresh feed",  "",           "" },
     { "Esc",        "back to feeds", "",           "" },
 };

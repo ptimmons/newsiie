@@ -4,10 +4,11 @@ An RSS and Atom news reader for the Enhanced Apple //e, with the network
 done by a [CoGS](https://a2cogs.com) card. Written in cc65 C with ca65
 assembly for the screen.
 
-Work in progress. Milestones 0 to 3 of [PLAN.md](PLAN.md) are done: the
+Work in progress. Milestones 0 to 4 of [PLAN.md](PLAN.md) are done: the
 splash, empty Feeds view, status bar and help box; finding the CoGS card;
 fetching feeds through it; and a feed parser for RSS 2.0, RSS 1.0 and Atom.
-The reader's own views come next.
+Milestone 4 adds the reader itself: pick a feed, and its headlines
+arrive in auxiliary memory and scroll on screen. Reading articles is next.
 
 ## Checking a CoGS card
 
@@ -44,4 +45,7 @@ tools/      bootstrap, disk builder, Virtual ][ driver (vii.sh)
 
 ## Keys so far
 
-`Open-Apple-?` help, `Open-Apple-Q` quit.
+Feeds: arrows choose, `Return` fetches and opens the feed. Headlines:
+arrows move, `Open-Apple`-arrows page, `Open-Apple-<` and `>` go to the ends,
+`Open-Apple-R` fetches again, `Esc` goes back. Anywhere: `Open-Apple-?` help,
+`Open-Apple-Q` quit. The feed list is built in until the feeds file arrives.

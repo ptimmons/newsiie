@@ -6,9 +6,9 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestones 0 to 3 are done and verified on a real card (see
-section 9). Next is milestone 4: the item store in aux memory and the
-Headlines view. Memory is now the constraint to plan around (section 5).
+**Status:** milestones 0 to 3 are done and verified on a real card, and
+milestone 4 (the item store and the Headlines view) is done in Virtual ][
+and waits on a real-card run (see section 9).
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -228,7 +228,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 1 ✅ | `cogs_io.s` + `cogs.c` with host model tests; `PROBE.SYSTEM`: find the card, PING, wait for link, show firmware, IP, time, data integrity both ways | host tests ✅, Virtual ][ no-card path ✅, **real card ✅** |
 | 2 ✅ | `FETCH.SYSTEM`: stream a URL to the end and report bytes, KB/s at four read sizes, content type (XML / gzip / HTML), and result codes for http, https, a redirect, a 404; then read the boot volume through ProDOS | host tests ✅, Virtual ][ menu and disk check ✅, **real card ✅** — settled the risks below |
 | 3 ✅ | Parser in C + fixtures + `make host-test`; `scan.s`; file back end; parse rate measured on the 6502 build | host tests ✅, corpus ✅, Virtual ][ ✅ (13 KB/s at 1 MHz), **real card ✅** (9.1 KB/s fetch+parse) |
-| 4 | Item store in aux; Headlines screen with scrolling | suite |
+| 4 (built) | Item store in aux; Headlines screen with scrolling | host tests ✅, Virtual ][ ✅, **real card: pending** |
 | 5 | Article screen: cleaning, UTF-8 folding, word wrap, paging | suite |
 | 6 | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | suite |
 | 7 | Live fetch wired in: progress, abort, error messages, refresh | **your card** |
@@ -452,4 +452,45 @@ Milestones 1–2 and 3 are independent and could run in parallel.
   than Ars Technica's 13 KB/s because NASA's long `content:encoded` bodies
   are skipped at `scan()` speed. The frame floor read 3.3 s, a large
   undercount, as expected.
+
+### Milestone 4 notes
+
+- **The store** (`store.c`, `auxmem.s`): one feed's items, packed in aux
+  `$0800-$BFFF` (47K) as variable-length records (length, flags, a 16-bit
+  hash of the guid for read markers, then title, date, link and body, each
+  with its length), with a 200-entry index in main memory. It is cleared
+  before each fetch and filled as the parser closes items; when the next
+  item will not fit, the fetch stops and what fitted is kept. Writes use
+  `RAMWRT`; reads run a 40-byte loop copied to `$0100`, since `RAMRD` would
+  also redirect instruction fetches. No read ever reaches `$C000` (I/O).
+- **`/RAM` is disconnected** at startup, after checking for 128K
+  (`MACHID`): slot 3 drive 2 is pointed at the no-device routine and `$BF`
+  taken out of `DEVLST`, but only if the vector is ProDOS's own `/RAM`
+  driver (`$FF00`); anything else there is refused rather than clobbered.
+  Checked in Virtual ][: `DEVLST` is `$E0 $60` afterwards.
+- **`source.c`** fetches a URL (CoGS stream) or a ProDOS pathname (a file)
+  through the parser into the store, with progress on the status bar and
+  Esc to stop. The two never overlap (section 1, rule 1).
+- **Views:** a Feeds list (built in until milestone 6) and the Headlines
+  view: date and title a row, inverse bar, arrows, Open-Apple-arrows to
+  page, Open-Apple-`<` `>` to the ends, Open-Apple-R to refetch, Esc back.
+  The heading says when a fetch was cut short or memory filled.
+- **The test build** (`make testdisk`) adds feed files on a second disk
+  (`make feedsdisk`: four corpus feeds as `/FEEDS`, not committed), so the
+  emulator can drive every screen without a card.
+- **Host tests:** 131 store checks against an array model of aux that
+  fails any access outside `$0800-$BFFF`: round trips, truncated copies,
+  filling to the brim, the item cap.
+- **A cc65 miscompile, found and guarded.** Headlines showed dates but no
+  titles. The record in aux was right; in main memory the title had been
+  written into the program's code at `$57F6`. This cc65 (reporting V2.18)
+  reloaded the `store_head()` parameter `h` with `ldy #$00 / jsr ldaxysp`;
+  `ldaxysp` takes the high byte at offset Y and the low at Y-1, so Y = 0
+  builds a pointer from the wrong bytes. Worked around with a static copy
+  of the pointer, and **every C file now compiles to assembly first and
+  `tools/cc65check.py` fails the build on any `ldaxysp`/`staxysp` called
+  with Y = 0**. A scan of all 22 files found only that one. The host tests
+  could never have caught it: the miscompile exists only in 6502 output.
+- **Memory:** the app is 30K loaded; BSS ends at `$A1BF`, leaving about 5K
+  of heap below the stack. Fits, with room for milestone 5, not much more.
 

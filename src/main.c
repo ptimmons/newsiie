@@ -1,12 +1,12 @@
 /*
  * newsiie -- an RSS and Atom reader for the Enhanced Apple //e, with the
- * network done by a CoGS card. Milestone 0: splash, the empty Feeds view,
- * the status bar and the help box.
+ * network done by a CoGS card.
  */
 #include <apple2.h>
 #include <stdint.h>
 #include "screen.h"
 #include "kbd.h"
+#include "store.h"
 #include "ui.h"
 
 /* Before the 80-column screen is known to exist: a message on the
@@ -24,7 +24,8 @@ static void fail40(const char *msg)
 int main(void)
 {
     uint8_t os = get_ostype();
-    uint8_t k;
+    uint8_t view = V_FEEDS;
+    const char *why;
 
     if (os < APPLE_IIE) {
         fail40("NEWSIIE NEEDS AN APPLE //E");
@@ -34,22 +35,18 @@ int main(void)
 
     scr_init();
     splash_show();
+    why = store_init();
+    if (why) {
+        status_msg(why);
+        key_get();
+        scr_done();
+        return 1;
+    }
     net_check();                /* while the splash is up */
     key_get();                  /* consumed: it must not act on the view */
 
-    feeds_draw();
-    for (;;) {
-        k = key_get();
-        if (!key_oa) {
-            continue;
-        }
-        if (k == '?' || k == '/' || k == 'h' || k == 'H') {
-            help_show();
-            key_get();
-            feeds_draw();
-        } else if (k == 'q' || k == 'Q') {
-            break;
-        }
+    while (view != V_QUIT) {
+        view = view == V_FEEDS ? feeds_run() : heads_run();
     }
 
     scr_done();

@@ -27,8 +27,17 @@ void status_fields(const char *left, const char *mid, const char *right)
 
 void status_main(const char *left, const char *mid)
 {
+    char up[COL_MID - COL_LEFT];
+    uint8_t i;
+
+    /* The bar is uppercase, and a long feed name stops short of the next
+     * field. */
+    for (i = 0; left[i] && i < sizeof up - 1; ++i) {
+        up[i] = (char)(left[i] >= 'a' && left[i] <= 'z' ? left[i] - 32 : left[i]);
+    }
+    up[i] = 0;
     lb_clear(SC_ISPACE);
-    lb_text(COL_LEFT, left, 1);
+    lb_text(COL_LEFT, up, 1);
     lb_text(COL_MID, mid, 1);
     lb_text(COL_NET, status_net, 1);
     lb_text(COL_HINT, OA "-? HELP   " OA "-Q QUIT", 1);
