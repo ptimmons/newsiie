@@ -24,6 +24,10 @@ void aux_init(void) {}
 void aux_put(uint16_t dst, const void *src, uint16_t n) { bounds(dst, n); memcpy(aux + dst, src, n); }
 void aux_get(void *dst, uint16_t src, uint16_t n) { bounds(src, n); memcpy(dst, aux + src, n); }
 
+/* The read set, as far as the store can tell: one hash. */
+static uint16_t read_hash;
+static uint8_t is_read(uint16_t x) { return (uint8_t)(x == read_hash); }
+
 static char body[FEED_BODY_MAX + 1], link[FEED_LINK_MAX + 1], title[FEED_TITLE_MAX + 1];
 
 static feed_item_t make(unsigned i, unsigned blen, unsigned llen)
@@ -115,6 +119,39 @@ int main(void)
         char want[32];
         snprintf(want, sizeof want, "Item %u title", STORE_MAX_ITEMS - 1);
         CHECK(!strcmp(h.title, want));
+    }
+
+    /* Read markers: the hook marks matching items as they arrive, and
+     * store_mark_read() marks one later. */
+    {
+        uint16_t h0;
+
+        store_reset();
+        it = make(1, 10, 10);
+        store_add(&it);
+        store_head(0, &h);
+        h0 = h.hash;
+        CHECK(!(h.flags & STORE_READ));
+        store_mark_read(0);
+        store_head(0, &h);
+        CHECK(h.flags & STORE_READ);
+
+        read_hash = h0;
+        store_is_read = 0;
+        store_reset();
+        store_add(&it);
+        store_head(0, &h);
+        CHECK(!(h.flags & STORE_READ));
+        store_is_read = is_read;
+        store_reset();
+        store_add(&it);
+        it = make(2, 10, 10);
+        store_add(&it);
+        store_head(0, &h);
+        CHECK(h.flags & STORE_READ);
+        store_head(1, &h);
+        CHECK(!(h.flags & STORE_READ));
+        store_is_read = 0;
     }
 
     CHECK(out_of_bounds == 0);

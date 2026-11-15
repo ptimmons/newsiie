@@ -54,6 +54,7 @@ static feed_item_t item;
 void feed_begin(void)
 {
     xml_reset();
+    xml_href = out_body;            /* never live at the same time */
     feed_kind = FEED_UNKNOWN;
     feed_title[0] = 0;
     feed_items = 0;

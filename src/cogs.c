@@ -19,12 +19,8 @@
 #include <stddef.h>
 #include "cogs.h"
 
-#define OP_PING         0x00
 #define OP_STATUS       0x01
 #define OP_TIME         0x05
-#define OP_LOCALTIME    0x0F
-#define OP_HASH         0x30
-#define OP_RANDOM       0x31
 #define OP_STREAM_OPEN  0x70
 #define OP_STREAM_READ  0x71
 #define OP_STREAM_CLOSE 0x72
@@ -209,25 +205,6 @@ uint8_t cogs_request(uint8_t op, const uint8_t *pre, uint8_t npre,
     return COGS_E_PROTO;
 }
 
-uint8_t cogs_ping(cogs_ping_t *p)
-{
-    uint8_t r[4];
-    uint16_t got;
-    uint8_t rc = cogs_request(OP_PING, NULL, 0, NULL, 0, r, sizeof r, &got);
-
-    if (rc) {
-        return rc;
-    }
-    if (got < 4) {
-        return COGS_E_PROTO;
-    }
-    p->fw_major = r[0];
-    p->fw_minor = r[1];
-    p->proto = r[2];
-    p->caps = r[3];
-    return COGS_OK;
-}
-
 uint8_t cogs_netstat(cogs_netstat_t *s)
 {
     uint8_t r[17];
@@ -267,50 +244,6 @@ uint8_t cogs_time(uint32_t *unix_utc)
     }
     *unix_utc = le32(r);
     return COGS_OK;
-}
-
-uint8_t cogs_localtime(uint8_t *valid, uint32_t *secs_1904)
-{
-    uint8_t r[6];
-    uint16_t got;
-    uint8_t rc = cogs_request(OP_LOCALTIME, NULL, 0, NULL, 0, r, sizeof r, &got);
-
-    if (rc) {
-        return rc;
-    }
-    if (got < 6) {
-        return COGS_E_PROTO;
-    }
-    *valid = r[0];
-    *secs_1904 = le32(r + 2);
-    return COGS_OK;
-}
-
-uint8_t cogs_random(uint8_t *dst, uint8_t n)
-{
-    uint16_t got;
-    uint8_t rc = cogs_request(OP_RANDOM, &n, 1, NULL, 0, dst, n, &got);
-
-    if (rc) {
-        return rc;
-    }
-    return got == n ? COGS_OK : COGS_E_PROTO;
-}
-
-uint8_t cogs_sha256(const uint8_t *src, uint16_t n, uint8_t digest[32])
-{
-    uint8_t pre[3];
-    uint16_t got;
-    uint8_t rc;
-
-    pre[0] = 0;                     /* algo: single SHA-256 */
-    pre[1] = (uint8_t)n;
-    pre[2] = (uint8_t)(n >> 8);
-    rc = cogs_request(OP_HASH, pre, 3, src, n, digest, 32, &got);
-    if (rc) {
-        return rc;
-    }
-    return got == 32 ? COGS_OK : COGS_E_PROTO;
 }
 
 /* Replies to the stream commands start handle, result. */

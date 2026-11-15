@@ -15,7 +15,7 @@
 char    *xml_cap;
 uint16_t xml_cap_len;
 uint16_t xml_cap_max;
-char     xml_href[512];
+char    *xml_href;
 char     xml_rel[16];
 uint8_t  xml_latin1;
 uint8_t  xml_stop;
@@ -412,7 +412,7 @@ void xml_feed(const uint8_t *p, uint16_t n)
                 quote = c == '"' ? SC_DQ : SC_SQ;
                 if (!strcmp(aname, "href")) {
                     aval = xml_href;
-                    avmax = sizeof xml_href - 1;
+                    avmax = XML_HREF_MAX;
                 } else if (!strcmp(aname, "rel")) {
                     aval = xml_rel;
                     avmax = sizeof xml_rel - 1;

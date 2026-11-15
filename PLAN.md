@@ -6,10 +6,10 @@ ZipEdit is the **design language**, not a code source: a clean 80-column
 screen, an inverse status bar on the bottom row, and a MouseText-boxed help
 screen. newsiie's code is its own.
 
-**Status:** milestones 0 to 5 are done and verified on a real card;
-milestones 6 and 7 are done in Virtual ][ and wait on a real-card run (see
-section 9). Next is milestone 8. Main memory is full: the language card
-holds code and the C stack is 1K (section 5).
+**Status:** all eight milestones are built; version 0.9. Milestones 0 to 5
+are verified on a real card; 6 to 8 are verified in Virtual ][ and wait on
+a real-card run before 1.0 (see section 9). `make release` builds
+`build/newsiie-0.9.zip`: the disk image and docs/MANUAL.md.
 
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
@@ -233,7 +233,7 @@ There is no CoGS-enabled MAME/Ample on this Mac. If you install the model
 | 5 ✅ | Article screen: cleaning, UTF-8 folding, word wrap, paging | host tests ✅, Virtual ][ ✅, real card ✅ |
 | 6 ✅ (emulator) | Feeds screen, `NEWSIIE.FEEDS` load/save, add/delete prompts | host tests ✅, Virtual ][ ✅, real card pending |
 | 7 ✅ (emulator) | Live fetch wired in: progress, abort, error messages, refresh | Virtual ][ ✅ (disk feeds, no-card error); **real card pending** for the network waits and Esc while connecting |
-| 8 | Read markers, save article, README and manual, release image | suite + card |
+| 8 ✅ (emulator) | Read markers, save article, README and manual, release image | host tests ✅, Virtual ][ ✅, real card pending |
 
 Milestones 1–2 and 3 are independent and could run in parallel.
 
@@ -576,4 +576,39 @@ This milestone added what a live network needs:
 - **Checked in Virtual ][:** a disk feed opens with `20 ITEMS, 17K`; a
   network feed with no card says `NO COGS CARD`. The network waits, Esc
   while connecting and the timed summary need the real card.
+
+### Milestone 8 notes
+
+- **Read markers** (`readset.c`): the 16-bit guid hashes of the last 256
+  items opened, 512 bytes in main memory, saved to `NEWSIIE.READ` (BIN,
+  little-endian words) when leaving a feed's headlines and at quit, never
+  during a fetch. `store_add()` asks the set through a hook, so items
+  arrive already marked; opening an article marks its record in aux and
+  adds its hash. Headlines shows a MouseText diamond (`*` without
+  MouseText) for unread items. A write-protected disk stops further saves
+  after the first refusal. Two guids share a hash about once in 65,536.
+- **Saving an article** (`save.c`, Open-Apple-S): a name from the title's
+  first 12 letters and digits plus `.MD`, editable, any ProDOS path; asks
+  before replacing; writes Markdown (`# title`, date, the full link, then
+  paragraphs) as TXT with CR endings. It runs from main memory because it
+  calls ProDOS, and it re-selects language-card RAM (`lc_ram()`) before
+  returning, since its caller, the Article view, runs from there.
+- **Memory, three more levers:** probe-only code split out of the app
+  (`cogs_extra.c`, `fmt_extra.c`: about 1.5K); the parser's Atom `href`
+  buffer now lives in the cleaned-body buffer, since the two are never
+  live together (512 bytes); `help.c` moved back to main memory to give
+  the language card room for the save code. Final map: code and data to
+  `$A4CA`, BSS to `$B43F`, about 1.7K of heap below the 1K stack at
+  `$BB00`; the language card holds 2.6K of its 3K.
+- **The manual** is docs/MANUAL.md; `make release` zips it with the disk.
+- **Checked in Virtual ][:** unread diamonds; opening an item clears its
+  diamond; the read set survives quitting and rebooting (`NEWSIIE.READ`,
+  2 bytes for one item); Open-Apple-S offered `ITSQUOTEDAND.MD` and wrote
+  the Markdown shown in the manual; the release disk boots as 0.9 with the
+  seven shipped feeds. Host: 136 store checks (5 new for the read hook),
+  all fixtures, all 10 corpus feeds after the `href` change.
+- **Before 1.0, on the real card:** milestones 6 to 8, particularly adding
+  and deleting feeds, the network waits and Esc while connecting, saving
+  an article, and the read set, on the network disk (and whether its
+  image accepts writes).
 

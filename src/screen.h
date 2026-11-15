@@ -28,6 +28,7 @@
 #define MT_RULE     0x4C        /* stroke along the TOP of the cell */
 #define MT_VERT     0x5F        /* stroke down the LEFT edge of the cell */
 #define MT_VERT_R   0x5A        /* stroke down the RIGHT edge of the cell */
+#define MT_DIAMOND  0x5B
 
 /* In strings, this byte draws the Open Apple glyph. */
 #define OA          "\x01"

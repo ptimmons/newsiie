@@ -17,9 +17,11 @@
 
 char *fmt_str(char *p, const char *s);
 char *fmt_u32(char *p, uint32_t v);
-char *fmt_i8(char *p, int8_t v);
-char *fmt_hex8(char *p, uint8_t v);         /* two digits, no '$' */
 char *fmt_ip(char *p, const uint8_t ip[4]);
+char *fmt_hex8(char *p, uint8_t v);         /* two digits, no '$' */
+
+/* fmt_extra.c: only the probe links these. */
+char *fmt_i8(char *p, int8_t v);
 char *fmt_dur(char *p, uint32_t secs);      /* "3d 4h 12m", "4h 12m", "12m 5s" */
 
 /* "YYYY-MM-DD HH:MM:SS" from seconds since 1904-01-01 00:00. Every fourth

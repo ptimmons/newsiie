@@ -12,6 +12,7 @@
         .export         _scr_init
         .export         _scr_done
         .export         _scr_blit
+        .export         _lc_ram
         .import         _linebuf
         .importzp       ptr1
 
@@ -70,6 +71,13 @@ _scr_done:
         jsr     ROM_SETVID
         jsr     ROM_SETKBD
         jsr     ROM_HOME
+        bit     LCRAM
+        rts
+
+; void lc_ram(void) -- read language-card RAM, bank 2, as cc65's startup
+; leaves it. Called after ProDOS by main code whose caller runs from the
+; language card (save.c), in case ProDOS did not restore it.
+_lc_ram:
         bit     LCRAM
         rts
 

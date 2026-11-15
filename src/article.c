@@ -18,6 +18,8 @@
 #include "feed.h"
 #include "store.h"
 #include "wrap.h"
+#include "readset.h"
+#include "save.h"
 #include "ui.h"
 
 /* This file's code runs from the language card ($D400-$DFFF, bank 2),
@@ -36,7 +38,9 @@ uint16_t cur_item;
 
 static store_head_t h;
 static uint16_t top;
-static char note[24];
+static uint16_t body_len;
+static char fname[65];
+static char note[48];
 static char where[24];
 
 /* The parser's idle buffer, 3073 bytes: the text, the link, then the
@@ -50,7 +54,12 @@ static void compose(void)
     uint16_t n, ln;
 
     store_head(cur_item, &h);
+    if (!(h.flags & STORE_READ)) {
+        store_mark_read(cur_item);
+        rs_add(h.hash);
+    }
     n = store_body(cur_item, BODY, FEED_BODY_MAX + 1);
+    body_len = n;
     ln = store_link(cur_item, LINK, FEED_LINK_MAX + 1);
     if (ln > WIDTH) {
         LINK[WIDTH - 1] = '>';      /* cut: the rest is in the store */
@@ -138,6 +147,45 @@ static void scroll_to(uint16_t t)
     }
 }
 
+/* Open-Apple-S: write the article as Markdown. The link shown is cut to
+ * the screen; the file gets it whole, then the cut is put back. */
+static void save(void)
+{
+    uint16_t ln;
+    uint8_t rc;
+    char *p;
+
+    save_name(h.title, fname);
+    if (!prompt("SAVE AS:", fname, sizeof fname - 1)) {
+        draw_status();
+        return;
+    }
+    if (save_exists(fname)) {
+        p = fmt_str(fmt_str(note, "REPLACE "), fname);
+        fmt_str(p, "?");
+        if (!confirm(note)) {
+            draw();
+            return;
+        }
+    }
+    status_msg("SAVING");
+    ln = store_link(cur_item, LINK, FEED_LINK_MAX + 1);
+    rc = save_markdown(fname, h.title, h.date, LINK, BODY, body_len);
+    if (ln > WIDTH) {
+        LINK[WIDTH - 1] = '>';
+    }
+    draw();
+    if (!rc) {
+        fmt_str(note, "SAVED AS ");
+        fmt_str(note + 9, fname);
+    } else if (rc == 0x2B) {
+        fmt_str(note, "THE DISK IS WRITE-PROTECTED");
+    } else {
+        fmt_hex8(fmt_str(note, "COULD NOT SAVE, PRODOS ERROR $"), rc);
+    }
+    status_msg(note);
+}
+
 uint8_t article_run(void)
 {
     uint8_t k;
@@ -163,6 +211,8 @@ uint8_t article_run(void)
             scroll_to((uint16_t)(top + (key_oa ? NROWS : 1)));
         } else if (k == ' ') {
             scroll_to((uint16_t)(top + NROWS));
+        } else if (key_oa && (k == 's' || k == 'S')) {
+            save();
         } else if (key_oa && (k == '<' || k == ',')) {
             scroll_to(0);
         } else if (key_oa && (k == '>' || k == '.')) {

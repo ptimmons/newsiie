@@ -34,8 +34,11 @@ extern char    *xml_cap;
 extern uint16_t xml_cap_len;
 extern uint16_t xml_cap_max;
 
-/* An Atom <link>'s attributes, valid during xml_open for XE_LINK. */
-extern char xml_href[512];
+/* An Atom <link>'s attributes, valid during xml_open for XE_LINK. The
+ * href buffer (XML_HREF_MAX + 1 bytes) is the caller's: feed.c lends the
+ * cleaned-body buffer, which is only used when an item closes. */
+#define XML_HREF_MAX    511
+extern char *xml_href;
 extern char xml_rel[16];
 
 /* Set from <?xml encoding="ISO-8859-1"?> (or windows-1252): bytes from $80

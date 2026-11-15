@@ -16,10 +16,12 @@
 #include "store.h"
 #include "source.h"
 #include "cogs.h"
+#include "readset.h"
 #include "ui.h"
 
 #define FIRST_ROW   2
 #define NROWS       (BODY_ROWS - FIRST_ROW)     /* 21 */
+#define MARK_COL    0                           /* unread: a diamond */
 #define DATE_COL    2
 #define TITLE_COL   14
 
@@ -37,6 +39,9 @@ static void draw_row(uint16_t i)
     lb_clear(inv ? SC_ISPACE : SC_SPACE);
     if (i < store_count) {
         store_head(i, &h);
+        if (!(h.flags & STORE_READ)) {
+            linebuf[MARK_COL] = has_mousetext ? MT_DIAMOND : sc_char('*', inv);
+        }
         if (h.date[0]) {
             lb_text(DATE_COL, h.date + 5, inv);     /* drop the year */
         }
@@ -139,6 +144,7 @@ uint8_t heads_run(void)
             continue;
         }
         if (k == K_ESC) {
+            rs_save();              /* no stream is open here */
             return V_FEEDS;
         }
         if (k == K_RETURN) {

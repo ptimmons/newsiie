@@ -5,6 +5,7 @@
 #   make testdisk   build/NEWSIIE-TEST.po: the app with feeds from a disk too
 #   make feedsdisk  build/FEEDS.po, that disk, from the corpus (not committed)
 #   make run        build, boot it in Virtual ][, print the screen
+#   make release    build/newsiie-<version>.zip: the disk and the manual
 #   make host-test  the C that has no Apple dependencies, run on the Mac:
 #                   card protocol, cleaner, and the feed fixtures
 #   make corpus     the parser on real feeds (tools/getcorpus.sh fetches them)
@@ -50,13 +51,17 @@ APP = \
 	src/wrap.c \
 	src/feedlist.c \
 	src/prompt.c \
+	src/readset.c \
+	src/save.c \
 	src/store.c \
 	src/source.c \
 	src/auxmem.s \
 	$(PARSER)
 
 PROBE = \
-	src/probe.c
+	src/probe.c \
+	src/cogs_extra.c \
+	src/fmt_extra.c
 
 FETCH = \
 	src/fetch.c \
@@ -75,7 +80,7 @@ DISK  = build/NEWSIIE.po
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk testdisk feedsdisk run host-test corpus clean
+.PHONY: all disk testdisk feedsdisk run release host-test corpus clean
 
 all: $(BIN) $(PRBIN) $(FTBIN)
 
@@ -130,13 +135,24 @@ build/FEEDS.po: tools/mkfeeds.sh tests/fixtures/caps.xml tests/fixtures/rss2.xml
 	@[ -d build/corpus ] || tools/getcorpus.sh
 	tools/mkfeeds.sh $@
 
+VERSION = $(shell sed -n 's/.*NEWSIIE_VERSION "\(.*\)".*/\1/p' src/ui.h)
+
+release: $(DISK) docs/MANUAL.md
+	mkdir -p build/release
+	cp $(DISK) build/release/newsiie-$(VERSION).po
+	cp docs/MANUAL.md build/release/MANUAL.md
+	cd build/release && zip -q -X ../newsiie-$(VERSION).zip newsiie-$(VERSION).po MANUAL.md
+	@echo "build/newsiie-$(VERSION).zip"
+
 run: $(DISK)
 	tools/vii.sh boot $(DISK)
 	tools/vii.sh await NEWSIIE 30
 	tools/vii.sh screen
 
-build/host/test_cogs: tests/host/test_cogs.c src/cogs.c src/fmt.c $(HDRS) | build/host
-	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_cogs.c src/cogs.c src/fmt.c
+HOST_COGS = src/cogs.c src/cogs_extra.c src/fmt.c src/fmt_extra.c
+
+build/host/test_cogs: tests/host/test_cogs.c $(HOST_COGS) $(HDRS) | build/host
+	$(HOST_CC) $(HOST_CFLAGS) -o $@ tests/host/test_cogs.c $(HOST_COGS)
 
 HOST_PARSER = src/feed.c src/xml.c src/clean.c src/scan_host.c src/scan_tab.c
 

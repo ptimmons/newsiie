@@ -4,11 +4,10 @@ An RSS and Atom news reader for the Enhanced Apple //e, with the network
 done by a [CoGS](https://a2cogs.com) card. Written in cc65 C with ca65
 assembly for the screen.
 
-Work in progress. Milestones 0 to 6 of [PLAN.md](PLAN.md) are done: the
-splash, empty Feeds view, status bar and help box; finding the CoGS card;
-fetching feeds through it; and a feed parser for RSS 2.0, RSS 1.0 and Atom.
-Milestone 4 adds the reader itself: pick a feed, and its headlines
-arrive in auxiliary memory and scroll on screen. Reading articles is next.
+Version 0.9: all eight milestones of [PLAN.md](PLAN.md) are built. Pick a
+feed, read its headlines and summaries, add and delete feeds, keep track
+of what you have read, and save articles for ZipEdit. See
+[the manual](docs/MANUAL.md).
 
 ## Checking a CoGS card
 
@@ -31,6 +30,7 @@ make disk              # build/NEWSIIE.po, a bootable ProDOS 8 image
 make run               # boot it in Virtual ][ and print the screen
 make host-test         # card protocol, text cleaner and feed fixtures, on the Mac
 make corpus            # the parser against ten live feeds
+make release           # build/newsiie-<version>.zip: the disk and the manual
 ```
 
 ## Layout

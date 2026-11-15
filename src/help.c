@@ -15,13 +15,6 @@
 #include "screen.h"
 #include "ui.h"
 
-/* This file's code runs from the language card ($D400-$DFFF, bank 2),
- * which cc65 fills at startup: main memory is full (PLAN.md section 5).
- * Code there must not call ProDOS or the ROM while it runs. */
-#ifdef __CC65__
-#pragma code-name ("LC")
-#endif
-
 #define BOX_L       7           /* column of the left side */
 #define BOX_R       72          /* column of the right side */
 #define TOP_ROW     0           /* the '_' row */

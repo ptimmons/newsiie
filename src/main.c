@@ -8,6 +8,7 @@
 #include "kbd.h"
 #include "store.h"
 #include "feedlist.h"
+#include "readset.h"
 #include "fmt.h"
 #include "ui.h"
 
@@ -52,6 +53,8 @@ int main(void)
         fmt_hex8(fmt_str(note, "COULD NOT READ NEWSIIE.FEEDS, ERROR $"), fl_oserror);
         feeds_note = note;
     }
+    rs_load();
+    store_is_read = rs_has;
     net_check();                /* while the splash is up */
     key_get();                  /* consumed: it must not act on the view */
 
@@ -63,6 +66,7 @@ int main(void)
         }
     }
 
+    rs_save();
     scr_done();
     return 0;
 }

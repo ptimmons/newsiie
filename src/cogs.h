@@ -108,6 +108,7 @@ typedef struct {
 #define COGS_LINK_JOINING   1
 #define COGS_LINK_UP        2
 
+/* cogs_extra.c: only the probe links these. */
 uint8_t cogs_ping(cogs_ping_t *p);
 uint8_t cogs_netstat(cogs_netstat_t *s);
 uint8_t cogs_time(uint32_t *unix_utc);             /* 0 until NTP has synced */

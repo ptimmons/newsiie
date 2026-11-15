@@ -57,6 +57,13 @@ void store_head(uint16_t i, store_head_t *h);
 uint16_t store_body(uint16_t i, char *dst, uint16_t cap);
 uint16_t store_link(uint16_t i, char *dst, uint16_t cap);
 
+/* Set by the app to the read set's lookup: items whose guid hash it knows
+ * arrive marked STORE_READ. NULL: nothing is read. */
+extern uint8_t (*store_is_read)(uint16_t hash);
+
+/* Mark item i read (its flags byte in aux). */
+void store_mark_read(uint16_t i);
+
 /* aux bytes still free */
 uint16_t store_free(void);
 

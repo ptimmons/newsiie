@@ -15,6 +15,7 @@ void __fastcall__ aux_get(void *dst, uint16_t aux_src, uint16_t n);
 
 uint16_t store_count;
 uint8_t  store_full;
+uint8_t (*store_is_read)(uint16_t hash);
 
 static uint16_t idx[STORE_MAX_ITEMS];
 static uint16_t next;
@@ -110,7 +111,7 @@ uint8_t store_add(const feed_item_t *it)
     }
     b[0] = (uint8_t)len;
     b[1] = (uint8_t)(len >> 8);
-    b[2] = 0;
+    b[2] = store_is_read && store_is_read(h) ? STORE_READ : 0;
     b[3] = (uint8_t)h;
     b[4] = (uint8_t)(h >> 8);
     b[5] = tl;
@@ -131,6 +132,13 @@ uint8_t store_add(const feed_item_t *it)
     idx[store_count++] = next;
     next = (uint16_t)(next + len);
     return 0;
+}
+
+void store_mark_read(uint16_t i)
+{
+    uint8_t f = STORE_READ;
+
+    aux_put((uint16_t)(idx[i] + 2), &f, 1);
 }
 
 /* Read the front of record i into b. Never past AUX_END. */
