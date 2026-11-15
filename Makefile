@@ -140,7 +140,7 @@ build/FEEDS.po: tools/mkfeeds.sh tests/fixtures/caps.xml tests/fixtures/rss2.xml
 	tools/mkfeeds.sh $@
 
 # The manual's screenshots: the same program but for a placeholder card
-# address (net.c, NEWSIIE_SHOTS), on a disk carrying two made-up feeds.
+# address (net.c, NEWSIIE_SHOTS), on a disk carrying a made-up feed.
 build/shots/net.o: src/net.c $(HDRS) tools/cc65check.py | build/shots
 	$(CL65) -t $(TARGET) $(COPT) -DNEWSIIE_SHOTS -S -o build/shots/net.s $<
 	python3 -I tools/cc65check.py build/shots/net.s > /dev/null || python3 -I tools/cc65check.py build/shots/net.s
@@ -154,11 +154,10 @@ $(SBIN): $(filter-out build/net.o,$(call obj,$(APP) $(COMMON))) build/feeds.o bu
 
 shotsdisk: $(SDISK)
 
-$(SDISK): $(SBIN) tools/mkdisk.sh docs/demo/NEWSIIE.FEEDS docs/demo/GAZETTE.XML docs/demo/BYTES.XML
+$(SDISK): $(SBIN) tools/mkdisk.sh docs/demo/NEWSIIE.FEEDS docs/demo/GAZETTE.XML
 	tools/mkdisk.sh $(SDISK) $(SBIN)
 	tools/ac -ptx $(SDISK) NEWSIIE.FEEDS < docs/demo/NEWSIIE.FEEDS
 	tools/ac -p $(SDISK) GAZETTE.XML TXT < docs/demo/GAZETTE.XML
-	tools/ac -p $(SDISK) BYTES.XML TXT < docs/demo/BYTES.XML
 
 shots: $(SDISK) tools/shots.sh
 	tools/shots.sh $(SDISK) docs/images

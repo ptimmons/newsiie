@@ -1,9 +1,11 @@
-# The feed list on the screenshot disk (make shotsdisk). The first two are
-# made-up feeds kept on the disk itself; the rest are the shipped ones.
-Orchard Valley Gazette|/NEWSIIE/GAZETTE.XML
-Bits and Bytes Weekly|/NEWSIIE/BYTES.XML
+# The feed list on the screenshot disk (make shotsdisk): the shipped list
+# (cfg/NEWSIIE.FEEDS), so the pictures show what a reader will see.
+# tools/shots.sh adds the made-up Orchard Valley Gazette, kept on the disk
+# itself, before the Chapter 2 pictures.
 Hacker News|https://hnrss.org/frontpage
 BBC News|https://feeds.bbci.co.uk/news/rss.xml
 Ars Technica|https://feeds.arstechnica.com/arstechnica/index
 NASA|https://www.nasa.gov/feed/
+New York Times|https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml
+Slashdot|http://rss.slashdot.org/Slashdot/slashdotMain
 xkcd|https://xkcd.com/atom.xml

@@ -124,7 +124,9 @@ status bar until you press the next key.
 
 > **By the way:** The pictures in this guide were made on an Apple IIe
 > simulator without a CoGS card, so the address you see in them is just
-> an example. Yours will be different.
+> an example. Yours will be different. To show stories without the
+> Internet, the pictures in Chapter 2 use the *Orchard Valley Gazette*, a
+> made-up feed added to the list for the purpose. It isn't on your disk.
 
 ### Getting Help
 
@@ -156,8 +158,9 @@ take half a minute.
 
 ![Figure 2-1. newsiie fetching a feed](images/fetching.png)
 
-**Figure 2-1.** newsiie at work. This feed is on the disk, so the status
-bar says `READING`; a feed from the Internet says `FETCHING`.
+**Figure 2-1.** newsiie at work. The *Orchard Valley Gazette* was made up
+for this guide and kept on the disk, so the status bar says `READING`; a
+feed from the Internet says `FETCHING`.
 
 > **By the way:** If a feed is taking too long, press ESC. newsiie stops,
 > and you can read whatever has arrived so far.
@@ -289,8 +292,8 @@ as newsiie. You can change it with any text editor, such as ZipEdit. Each
 line holds one feed: its name, a bar ( | ), and its address.
 
 ```
-Orchard Valley Gazette|/NEWSIIE/GAZETTE.XML
 Hacker News|https://hnrss.org/frontpage
+NASA|https://www.nasa.gov/feed/
 https://xkcd.com/atom.xml
 ```
 

@@ -2,9 +2,10 @@
 # shots.sh <image.po> <dir> -- capture the manual's screenshots.
 #
 # Boots the screenshot disk (make shotsdisk) in Virtual ][ and walks
-# through the program, saving a PNG at each step. The disk carries two
-# made-up feeds, read from the disk itself, so no card or network is
-# needed and no one else's writing appears in the manual.
+# through the program, saving a PNG at each step. The disk's feed list is
+# the shipped one, so Chapter 1 and 3 show what a reader will see; for
+# Chapter 2 the script adds a made-up feed kept on the disk itself, so no
+# card or network is needed and no one else's writing appears in the manual.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -50,6 +51,24 @@ snap add-name
 "$V" key esc >/dev/null
 "$V" await "7 feeds" 10
 
+"$V" key "down arrow" >/dev/null
+"$V" oa d >/dev/null
+"$V" await "DELETE" 10
+snap delete
+"$V" text "n" >/dev/null
+"$V" await "7 feeds" 10
+
+# The made-up feed, added the way the manual says; it becomes the eighth
+# and the bar moves to it.
+"$V" oa a >/dev/null
+"$V" await "FEED URL:" 10
+"$V" text "/NEWSIIE/GAZETTE.XML" >/dev/null
+"$V" ret >/dev/null
+"$V" await "NAME:" 10
+"$V" text "Orchard Valley Gazette" >/dev/null
+"$V" ret >/dev/null
+"$V" await "8 feeds" 10
+
 # Fetching, at a real //e's speed so the progress shows.
 osascript -e 'tell application "Virtual ][" to set speed of (last machine) to regular' >/dev/null
 "$V" ret >/dev/null
@@ -76,13 +95,5 @@ sleep 1
 "$V" key esc >/dev/null
 "$V" await "2 OF 8" 10
 snap headlines
-
-"$V" key esc >/dev/null
-"$V" await "7 feeds" 10
-"$V" key "down arrow" >/dev/null
-"$V" oa d >/dev/null
-"$V" await "DELETE" 10
-snap delete
-"$V" text "n" >/dev/null
 
 echo "screenshots in $OUT"
