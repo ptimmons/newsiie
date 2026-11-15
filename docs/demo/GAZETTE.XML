@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A made-up feed for the manual's screenshots. Every place, person and
+     event in it is fictional. -->
+<rss version="2.0">
+<channel>
+  <title>Orchard Valley Gazette</title>
+  <link>http://gazette.example/</link>
+  <description>News from the valley, on your computer.</description>
+  <item>
+    <title>User Group Meets Thursday at the Library</title>
+    <link>http://gazette.example/1985/11/user-group</link>
+    <pubDate>Thu, 14 Nov 1985 09:30:00 PST</pubDate>
+    <guid>gazette-1985-11-14-1</guid>
+    <description><![CDATA[<p>The Orchard Valley Apple II Users' Group will meet this Thursday at 7:30 in the community room of the public library. Members are asked to bring blank disks for the monthly disk swap.</p><p>This month's program is a demonstration of a 1200-baud modem, followed by questions and answers on printers, word processing and the new 3.5-inch drives.</p><p>Visitors are welcome. Refreshments will be served.</p>]]></description>
+  </item>
+  <item>
+    <title>Computer Store Gets Its First 3.5-Inch Drives</title>
+    <link>http://gazette.example/1985/11/drives</link>
+    <pubDate>Wed, 13 Nov 1985 16:05:00 PST</pubDate>
+    <guid>gazette-1985-11-13-2</guid>
+    <description><![CDATA[<p>The computer store on Main Street received its first shipment of 3.5-inch disk drives this week. Each disk holds 800K, more than five times as much as a 5.25-inch floppy.</p><p>"People keep asking whether their old disks will still work," the manager said. "They will. You can have both."</p>]]></description>
+  </item>
+  <item>
+    <title>High School Team Wins State Programming Contest</title>
+    <link>http://gazette.example/1985/11/contest</link>
+    <pubDate>Tue, 12 Nov 1985 11:15:00 PST</pubDate>
+    <guid>gazette-1985-11-12-3</guid>
+    <description><![CDATA[<p>Three seniors from Orchard Valley High took first place at the state programming contest on Saturday, solving five of the six problems in the time allowed.</p><p>The team's winning entries:</p><ul><li>a program to schedule the school's bus routes</li><li>a word puzzle solver</li><li>a simulation of traffic at the fairgrounds</li></ul><p>The team will go on to the regional contest in the spring.</p>]]></description>
+  </item>
+  <item>
+    <title>Clear Skies Forecast for the Harvest Fair</title>
+    <link>http://gazette.example/1985/11/weather</link>
+    <pubDate>Mon, 11 Nov 1985 07:00:00 PST</pubDate>
+    <guid>gazette-1985-11-11-4</guid>
+    <description><![CDATA[<p>Clear and cool through the weekend, with highs in the low sixties. Frost is likely in the low-lying orchards on Saturday night.</p>]]></description>
+  </item>
+  <item>
+    <title>Letters: In Praise of the 80-Column Card</title>
+    <link>http://gazette.example/1985/11/letters</link>
+    <pubDate>Sun, 10 Nov 1985 12:00:00 PST</pubDate>
+    <guid>gazette-1985-11-10-5</guid>
+    <description><![CDATA[<p>To the editor:<br>Since we added an 80-column card, my wife writes her newsletter on the computer, and I have not had to retype a page since.<br>A satisfied reader, Elm Street.</p>]]></description>
+  </item>
+  <item>
+    <title>Valley Bulletin Board Adds a Second Phone Line</title>
+    <link>http://gazette.example/1985/11/bbs</link>
+    <pubDate>Sat, 09 Nov 1985 18:45:00 PST</pubDate>
+    <guid>gazette-1985-11-09-6</guid>
+    <description><![CDATA[<p>The valley's computer bulletin board now answers on two lines, so callers should find a busy signal less often in the evenings.</p>]]></description>
+  </item>
+  <item>
+    <title>Library to Lend Educational Software</title>
+    <link>http://gazette.example/1985/11/library</link>
+    <pubDate>Fri, 08 Nov 1985 10:20:00 PST</pubDate>
+    <guid>gazette-1985-11-08-7</guid>
+    <description><![CDATA[<p>Starting next month, cardholders may borrow educational programs for one week at a time, the same as books.</p>]]></description>
+  </item>
+  <item>
+    <title>Recipe Corner: Apple Crisp for a Crowd</title>
+    <link>http://gazette.example/1985/11/recipe</link>
+    <pubDate>Thu, 07 Nov 1985 08:00:00 PST</pubDate>
+    <guid>gazette-1985-11-07-8</guid>
+    <description><![CDATA[<p>With the harvest in, here is a crisp that serves twenty. Slice twelve apples, toss with sugar and cinnamon, and top with oats, flour and butter. Bake for forty minutes.</p>]]></description>
+  </item>
+</channel>
+</rss>

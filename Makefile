@@ -6,6 +6,7 @@
 #   make feedsdisk  build/FEEDS.po, that disk, from the corpus (not committed)
 #   make run        build, boot it in Virtual ][, print the screen
 #   make release    build/newsiie-<version>.zip: the disk and the manual
+#   make shots      boot the screenshot disk and capture docs/images/*.png
 #   make host-test  the C that has no Apple dependencies, run on the Mac:
 #                   card protocol, cleaner, and the feed fixtures
 #   make corpus     the parser on real feeds (tools/getcorpus.sh fetches them)
@@ -80,11 +81,11 @@ DISK  = build/NEWSIIE.po
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk testdisk feedsdisk run release host-test corpus clean
+.PHONY: all disk testdisk feedsdisk shotsdisk shots run release host-test corpus clean
 
 all: $(BIN) $(PRBIN) $(FTBIN)
 
-build build/host build/test build/asm:
+build build/host build/test build/asm build/shots:
 	mkdir -p $@
 
 # C goes through assembly so tools/cc65check.py can look at it: this cc65
@@ -135,13 +136,38 @@ build/FEEDS.po: tools/mkfeeds.sh tests/fixtures/caps.xml tests/fixtures/rss2.xml
 	@[ -d build/corpus ] || tools/getcorpus.sh
 	tools/mkfeeds.sh $@
 
+# The manual's screenshots: the same program but for a placeholder card
+# address (net.c, NEWSIIE_SHOTS), on a disk carrying two made-up feeds.
+build/shots/net.o: src/net.c $(HDRS) tools/cc65check.py | build/shots
+	$(CL65) -t $(TARGET) $(COPT) -DNEWSIIE_SHOTS -S -o build/shots/net.s $<
+	python3 -I tools/cc65check.py build/shots/net.s > /dev/null || python3 -I tools/cc65check.py build/shots/net.s
+	$(CL65) -t $(TARGET) -c -o $@ build/shots/net.s
+
+SBIN  = build/shots/NEWSIIE.SYSTEM
+SDISK = build/NEWSIIE-SHOTS.po
+
+$(SBIN): $(filter-out build/net.o,$(call obj,$(APP) $(COMMON))) build/feeds.o build/shots/net.o $(CFG)
+	$(CL65) -t $(TARGET) -C $(CFG) -o $@ $(filter-out build/net.o,$(call obj,$(APP) $(COMMON))) build/feeds.o build/shots/net.o
+
+shotsdisk: $(SDISK)
+
+$(SDISK): $(SBIN) tools/mkdisk.sh docs/demo/NEWSIIE.FEEDS docs/demo/GAZETTE.XML docs/demo/BYTES.XML
+	tools/mkdisk.sh $(SDISK) $(SBIN)
+	tools/ac -ptx $(SDISK) NEWSIIE.FEEDS < docs/demo/NEWSIIE.FEEDS
+	tools/ac -p $(SDISK) GAZETTE.XML TXT < docs/demo/GAZETTE.XML
+	tools/ac -p $(SDISK) BYTES.XML TXT < docs/demo/BYTES.XML
+
+shots: $(SDISK) tools/shots.sh
+	tools/shots.sh $(SDISK) docs/images
+
 VERSION = $(shell sed -n 's/.*NEWSIIE_VERSION "\(.*\)".*/\1/p' src/ui.h)
 
-release: $(DISK) docs/MANUAL.md
-	mkdir -p build/release
+release: $(DISK) docs/MANUAL.md $(wildcard docs/images/*.png)
+	mkdir -p build/release/images
 	cp $(DISK) build/release/newsiie-$(VERSION).po
 	cp docs/MANUAL.md build/release/MANUAL.md
-	cd build/release && zip -q -X ../newsiie-$(VERSION).zip newsiie-$(VERSION).po MANUAL.md
+	cp docs/images/*.png build/release/images/
+	cd build/release && zip -q -X -r ../newsiie-$(VERSION).zip newsiie-$(VERSION).po MANUAL.md images
 	@echo "build/newsiie-$(VERSION).zip"
 
 run: $(DISK)

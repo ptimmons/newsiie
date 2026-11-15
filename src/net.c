@@ -1,6 +1,11 @@
 /*
  * The app's view of the card: found or not, and the link state, as a
- * status-bar field. Fetching arrives in milestone 2.
+ * status-bar field.
+ *
+ * The manual's screenshots come from an emulator with no CoGS card, where
+ * every picture would say NO COGS CARD. Built with NEWSIIE_SHOTS (make
+ * shotsdisk), the field shows a placeholder address instead; the manual
+ * says so. Nothing else differs.
  */
 #include "cogs.h"
 #include "fmt.h"
@@ -14,7 +19,11 @@ void net_check(void)
 
     slot = cogs_slot ? cogs_slot : cogs_find();
     if (!slot) {
+#ifdef NEWSIIE_SHOTS
+        fmt_str(status_net, "COGS 192.168.1.60");
+#else
         fmt_str(status_net, "NO COGS CARD");
+#endif
         return;
     }
     rc = cogs_slot ? 0 : cogs_open(slot);

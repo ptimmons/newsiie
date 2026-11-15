@@ -35,9 +35,13 @@ static void draw_row(uint8_t i)
 {
     uint8_t inv = (uint8_t)(i == sel);
 
+    uint8_t n;
+
     fl_get(i);
     lb_clear(inv ? SC_ISPACE : SC_SPACE);
-    lb_text(NAME_COL, fl_name, inv);
+    /* A name may be 31 characters; the column holds 22 and a space. */
+    n = (uint8_t)strlen(fl_name);
+    lb_textn(NAME_COL, fl_name, n < URL_COL - NAME_COL - 1 ? n : URL_COL - NAME_COL - 1, inv);
     lb_text(URL_COL, fl_url, inv);
     scr_blit((uint8_t)(FIRST_ROW + i));
 }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A made-up Atom feed for the manual's screenshots. Fictional. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Bits and Bytes Weekly</title>
+  <link href="http://bits.example/" rel="alternate"/>
+  <updated>1985-11-14T08:00:00Z</updated>
+  <entry>
+    <title>Ten Tips for Longer-Lasting Floppy Disks</title>
+    <link href="http://bits.example/1985/11/floppies"/>
+    <id>bits-1985-11-14</id>
+    <published>1985-11-14T08:00:00Z</published>
+    <summary type="html">&lt;p&gt;Keep them away from magnets, out of the sun, and in their sleeves.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>What Is a Modem, Anyway?</title>
+    <link href="http://bits.example/1985/11/modems"/>
+    <id>bits-1985-11-07</id>
+    <published>1985-11-07T08:00:00Z</published>
+    <summary type="html">&lt;p&gt;A modem lets your computer talk to another over the telephone.&lt;/p&gt;</summary>
+  </entry>
+</feed>

@@ -612,3 +612,14 @@ This milestone added what a live network needs:
   an article, and the read set, on the network disk (and whether its
   image accepts writes).
 
+- **The manual, rewritten** (after milestone 8) as a period user's guide:
+  chapters, numbered steps, "Important" and "By the way" notes, keys in
+  capitals, a quick-reference appendix and a message list. Its 11
+  figures are real screenshots: `make shots` boots `make shotsdisk` in
+  Virtual ][ and captures them with `tools/shots.sh`. That disk carries
+  two made-up feeds (docs/demo: the Orchard Valley Gazette, 1985) read
+  from the disk, so no card, network or anyone else's writing is needed;
+  its build differs only in showing a placeholder card address
+  (`NEWSIIE_SHOTS` in net.c), which the manual points out.
+- Feed names longer than the Feeds screen's 22-character column are now
+  clipped instead of running into the URL.
