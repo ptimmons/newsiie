@@ -426,9 +426,10 @@ carries on: your list works as usual until you quit.
 These are the messages Newsiie may show on the status bar, what they
 mean, and what to do.
 
-**NO COGS CARD**
+**NO NETWORK CARD** or **NO COGS CARD OR FUJINET FOUND**
 Newsiie couldn't find a CoGS card. Make sure the card is firmly seated
-in its slot, then start Newsiie again.
+in its slot, then start Newsiie again. You can still read feeds saved
+as files on a disk.
 
 **WAITING FOR THE NETWORK**
 The CoGS card isn't connected to your network yet. This is normal for a

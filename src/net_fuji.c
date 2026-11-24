@@ -1,12 +1,14 @@
 /*
- * The FujiNet build's view of the network: found or not, on Wi-Fi or not,
- * and its address, as a status-bar field. See net.c for the CoGS build's.
+ * The FujiNet driver's view of the network: found or not, on Wi-Fi or not,
+ * and its address, as a status-bar field. Part of NEWSIIE.FUJI; the app
+ * calls it as net_check() (netdrv.h). See net.c for the CoGS card's.
  */
 #include "fuji.h"
 #include "fmt.h"
 #include "ui.h"
+#include "netdrv.h"
 
-void net_check(void)
+void fuji_net_check(void)
 {
     uint8_t ip[4];
     char version[15];

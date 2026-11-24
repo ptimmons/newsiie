@@ -1,7 +1,10 @@
-# newsiie -- an RSS reader for the Enhanced Apple //e with a CoGS card.
+# newsiie -- an RSS reader for the Enhanced Apple //e with a CoGS card or a
+# FujiNet.
 #
-#   make            build NEWSIIE.SYSTEM and the two probes, PROBE and FETCH
-#   make disk       the bootable ProDOS image build/NEWSIIE.po, carrying all three
+#   make            build NEWSIIE.SYSTEM, its network drivers NEWSIIE.COGS and
+#                   NEWSIIE.FUJI, and the probes: PROBE and FETCH for the
+#                   CoGS card, FNFETCH for the FujiNet
+#   make disk       the bootable ProDOS image build/NEWSIIE.po, carrying them all
 #   make testdisk   build/NEWSIIE-TEST.po: the app with feeds from a disk too
 #   make feedsdisk  build/FEEDS.po, that disk, from the corpus (not committed)
 #   make run        build, boot it in Virtual ][, print the screen
@@ -10,16 +13,15 @@
 #   make host-test  the C that has no Apple dependencies, run on the Mac:
 #                   card protocol, cleaner, and the feed fixtures
 #   make corpus     the parser on real feeds (tools/getcorpus.sh fetches them)
-#   make fujinet    the FujiNet build, under build/fujinet/: the same app with
-#                   the FujiNet's network device in place of the CoGS card,
-#                   and a FujiNet FETCH.SYSTEM
-#   make fujinetdisk      build/fujinet/NEWSIIE.po, carrying both
-#   make fujinettestdisk  build/fujinet/NEWSIIE-TEST.po: with feeds from /FEEDS
+#
+# make PROBE_HOST=192.168.1.2:8000 adds two FNFETCH tests that fetch from a
+# test server there (a bench aid; see PLAN.md section 12).
 #   make clean
 
 TARGET  = apple2enh
 CL65    = cl65
 CFG     = cfg/newsiie.cfg
+APPCFG  = cfg/newsiie-app.cfg
 # -Or: optimise with register variables, no inlining (measured 9% smaller than
 # -Oirs, and the hot loops are assembly anyway); -Cl: static locals
 COPT    = -Or -Cl
@@ -39,13 +41,20 @@ COGS = \
 	src/slot.c \
 	src/cogs_io.s
 
-# Shared by the CoGS app and its probes.
+# Shared by the CoGS probes.
 COMMON = $(BASE) $(COGS)
 
 # The FujiNet, over SmartPort.
 FUJI = \
 	src/fuji.c \
 	src/sp.s
+
+# The network drivers (src/netdrv.h): linked with the app, but each into a
+# file of its own, NEWSIIE.COGS and NEWSIIE.FUJI, which runs in the driver
+# slot. Their objects are compiled apart, into build/drv/cogs and
+# build/drv/fuji, with segment names of their own.
+DRV_COGS = src/drv_cogs.s $(COGS) src/net.c src/src_cogs.c
+DRV_FUJI = src/drv_fuji.s $(FUJI) src/net_fuji.c src/src_fuji.c
 
 # The feed parser. Plain C but for scan.s, whose twin on the Mac is
 # scan_host.c.
@@ -56,8 +65,7 @@ PARSER = \
 	src/scan_tab.c \
 	src/scan.s
 
-# The app, either build. (feeds.c is named in the link rule; splash.c
-# differs between the builds.)
+# The app. (feeds.c is named in the link rule.)
 APP_CORE = \
 	src/main.c \
 	src/help.c \
@@ -74,8 +82,7 @@ APP_CORE = \
 	src/auxmem.s \
 	$(PARSER)
 
-# The CoGS app.
-APP = $(APP_CORE) src/splash.c src/net.c src/src_cogs.c
+APP = $(APP_CORE) src/splash.c src/netdrv.c src/netcall.s
 
 PROBE = \
 	src/probe.c \
@@ -87,24 +94,27 @@ FETCH = \
 	src/disk.s \
 	$(PARSER)
 
+FNFETCH = src/fnfetch.c src/disk.s $(PARSER) $(BASE) $(FUJI)
+
 obj = $(patsubst src/%.s,build/%.o,$(patsubst src/%.c,build/%.o,$(1)))
 HDRS = $(wildcard src/*.h)
 
 BIN   = build/NEWSIIE.SYSTEM
+DRVS  = $(BIN).COGS $(BIN).FUJI
 TDISK = build/NEWSIIE-TEST.po
 PRBIN = build/PROBE.SYSTEM
 FTBIN = build/FETCH.SYSTEM
+FNBIN = build/FNFETCH.SYSTEM
 DISK  = build/NEWSIIE.po
 
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk testdisk feedsdisk shotsdisk shots run release host-test corpus clean \
-	fujinet fujinetdisk fujinettestdisk FORCE
+.PHONY: all disk testdisk feedsdisk shotsdisk shots run release host-test corpus clean FORCE
 
-all: $(BIN) $(PRBIN) $(FTBIN)
+all: $(BIN) $(PRBIN) $(FTBIN) $(FNBIN)
 
-build build/host build/test build/asm build/shots build/fujinet:
+build build/host build/test build/asm build/shots build/drv/cogs build/drv/fuji:
 	mkdir -p $@
 
 # C goes through assembly so tools/cc65check.py can look at it: this cc65
@@ -118,12 +128,55 @@ build/%.o: src/%.c $(HDRS) tools/cc65check.py | build build/asm
 build/%.o: src/%.s | build
 	$(CL65) -t $(TARGET) -c -o $@ $<
 
-# The app opens files, so the heap left below the stack must hold cc65's
-# 1K page-aligned ProDOS buffer: tools/memcheck.py fails the build if not.
-$(BIN): $(call obj,$(APP) $(COMMON)) build/feeds.o $(CFG) tools/memcheck.py
-	$(CL65) -t $(TARGET) -C $(CFG) -m build/newsiie.map -Ln build/newsiie.lbl -o $@ $(call obj,$(APP) $(COMMON)) build/feeds.o
-	@echo "NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
-	@python3 -I tools/memcheck.py build/newsiie.map $(CFG) || { rm -f $@; exit 1; }
+# The commit (with + when src/ has changes not committed), rewritten only
+# when it changes, so splash.o and fnfetch.o follow it: the splash screen
+# and FNFETCH show it, so a test can tell which build booted.
+GITREV := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)$(shell git diff --quiet HEAD -- src 2>/dev/null || echo +)
+BDEFS   = -DNEWSIIE_BUILD='" $(GITREV)"'
+ifdef PROBE_HOST
+BDEFS  += -DPROBE_HOST='"$(PROBE_HOST)"'
+endif
+
+build/rev: FORCE | build
+	@[ "$$(cat $@ 2>/dev/null)" = "$(GITREV)" ] || echo "$(GITREV)" > $@
+
+build/splash.o build/fnfetch.o: build/%.o: src/%.c build/rev $(HDRS) tools/cc65check.py | build build/asm
+	$(CL65) -t $(TARGET) $(COPT) $(BDEFS) -S -o build/asm/$*.s $<
+	python3 -I tools/cc65check.py build/asm/$*.s > /dev/null || python3 -I tools/cc65check.py build/asm/$*.s
+	$(CL65) -t $(TARGET) -c -o $@ build/asm/$*.s
+
+# A driver's objects: its C into the COGS* or FUJI* segments (cfg/newsiie-app.cfg),
+# its assembly with NETDRV defined, which picks the same.
+build/drv/cogs/%.o: SEG = COGS
+build/drv/fuji/%.o: SEG = FUJI
+DRVC = --code-name $(SEG)CODE --rodata-name $(SEG)RO --data-name $(SEG)DATA --bss-name $(SEG)BSS
+
+build/drv/cogs/%.o build/drv/fuji/%.o: src/%.c $(HDRS) tools/cc65check.py
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) $(COPT) $(DRVC) -S -o $(@:.o=.s) $<
+	python3 -I tools/cc65check.py $(@:.o=.s) > /dev/null || python3 -I tools/cc65check.py $(@:.o=.s)
+	$(CL65) -t $(TARGET) -c -o $@ $(@:.o=.s)
+
+build/drv/cogs/%.o build/drv/fuji/%.o: src/%.s
+	@mkdir -p $(@D)
+	$(CL65) -t $(TARGET) --asm-define NETDRV=1 -c -o $@ $<
+
+drvobj = $(patsubst src/%.s,build/drv/$(1)/%.o,$(patsubst src/%.c,build/drv/$(1)/%.o,$(2)))
+DRV_OBJ = $(call drvobj,cogs,$(DRV_COGS)) $(call drvobj,fuji,$(DRV_FUJI))
+APP_OBJ = $(call obj,$(APP) $(BASE)) build/feeds.o
+
+# The app and its drivers in one link: $(BIN) and $(BIN).COGS, $(BIN).FUJI.
+# The app opens files, so the heap left below the stack and the driver slot
+# must hold cc65's 1K page-aligned ProDOS buffer: tools/memcheck.py fails
+# the build if not. tools/drvcheck.sh fails it if the app reaches into a
+# driver other than through its table.
+$(BIN): $(APP_OBJ) $(DRV_OBJ) $(APPCFG) tools/memcheck.py tools/drvcheck.sh
+	$(CL65) -t $(TARGET) -C $(APPCFG) -m build/newsiie.map -Ln build/newsiie.lbl -o $@ $(APP_OBJ) $(DRV_OBJ)
+	@echo "NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes; NEWSIIE.COGS $$(wc -c < $@.COGS), NEWSIIE.FUJI $$(wc -c < $@.FUJI)"
+	@python3 -I tools/memcheck.py build/newsiie.map $(APPCFG) || { rm -f $@; exit 1; }
+	@tools/drvcheck.sh "$(APP_OBJ)" "$(DRV_OBJ)" || { rm -f $@; exit 1; }
+
+$(DRVS): $(BIN)
 
 
 $(PRBIN): $(call obj,$(PROBE) $(COMMON)) $(CFG)
@@ -134,21 +187,30 @@ $(FTBIN): $(call obj,$(FETCH) $(COMMON)) $(CFG)
 	$(CL65) -t $(TARGET) -C $(CFG) -m build/fetch.map -Ln build/fetch.lbl -o $@ $(call obj,$(FETCH) $(COMMON))
 	@echo "FETCH.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
 
+$(FNBIN): $(call obj,$(FNFETCH)) $(CFG)
+	$(CL65) -t $(TARGET) -C $(CFG) -m build/fnfetch.map -Ln build/fnfetch.lbl -o $@ $(call obj,$(FNFETCH))
+	@echo "FNFETCH.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
+
 disk: $(DISK)
 
 # NEWSIIE.SYSTEM goes first, so it is the one ProDOS launches at boot.
-# The probes are launched from the quit selector. NEWSIIE.FEEDS is the
-# starting feed list, put on as a ProDOS text file (CR line endings).
-$(DISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh cfg/NEWSIIE.FEEDS
-	tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN) $(FTBIN)
+# The probes are launched from the quit selector. The drivers go on as
+# binary files, loaded by NEWSIIE.SYSTEM from the same folder. NEWSIIE.FEEDS
+# is the starting feed list, put on as a ProDOS text file (CR line endings).
+ADDDRV = tools/ac -p $(1) NEWSIIE.COGS BIN < $(BIN).COGS && tools/ac -p $(1) NEWSIIE.FUJI BIN < $(BIN).FUJI
+
+$(DISK): $(BIN) $(DRVS) $(PRBIN) $(FTBIN) $(FNBIN) tools/mkdisk.sh cfg/NEWSIIE.FEEDS
+	tools/mkdisk.sh $(DISK) $(BIN) $(PRBIN) $(FTBIN) $(FNBIN)
+	$(call ADDDRV,$(DISK))
 	tools/ac -ptx $(DISK) NEWSIIE.FEEDS < cfg/NEWSIIE.FEEDS
 
 testdisk: $(TDISK)
 
 # The same program, with a feed list that also reads feeds from the
 # second disk, /FEEDS, so the emulator, which has no card, can drive it.
-$(TDISK): $(BIN) $(PRBIN) $(FTBIN) tools/mkdisk.sh tests/NEWSIIE.FEEDS
-	tools/mkdisk.sh $(TDISK) $(BIN) $(PRBIN) $(FTBIN)
+$(TDISK): $(BIN) $(DRVS) $(PRBIN) $(FTBIN) $(FNBIN) tools/mkdisk.sh tests/NEWSIIE.FEEDS
+	tools/mkdisk.sh $(TDISK) $(BIN) $(PRBIN) $(FTBIN) $(FNBIN)
+	$(call ADDDRV,$(TDISK))
 	tools/ac -ptx $(TDISK) NEWSIIE.FEEDS < tests/NEWSIIE.FEEDS
 
 # Four corpus feeds on a 140K disk named /FEEDS, for drive 2.
@@ -159,17 +221,19 @@ build/FEEDS.po: tools/mkfeeds.sh tests/fixtures/caps.xml tests/fixtures/rss2.xml
 	tools/mkfeeds.sh $@
 
 # The manual's screenshots: the same program but for a placeholder card
-# address (net.c, NEWSIIE_SHOTS), on a disk carrying a made-up feed.
-build/shots/net.o: src/net.c $(HDRS) tools/cc65check.py | build/shots
-	$(CL65) -t $(TARGET) $(COPT) -DNEWSIIE_SHOTS -S -o build/shots/net.s $<
-	python3 -I tools/cc65check.py build/shots/net.s > /dev/null || python3 -I tools/cc65check.py build/shots/net.s
-	$(CL65) -t $(TARGET) -c -o $@ build/shots/net.s
+# address when there is no card (netdrv.c, NEWSIIE_SHOTS) and no build on
+# the splash screen, on a disk carrying a made-up feed and no drivers.
+build/shots/netdrv.o build/shots/splash.o: build/shots/%.o: src/%.c $(HDRS) tools/cc65check.py | build/shots
+	$(CL65) -t $(TARGET) $(COPT) -DNEWSIIE_SHOTS -S -o build/shots/$*.s $<
+	python3 -I tools/cc65check.py build/shots/$*.s > /dev/null || python3 -I tools/cc65check.py build/shots/$*.s
+	$(CL65) -t $(TARGET) -c -o $@ build/shots/$*.s
 
 SBIN  = build/shots/NEWSIIE.SYSTEM
 SDISK = build/NEWSIIE-SHOTS.po
+SAPP_OBJ = $(filter-out build/netdrv.o build/splash.o,$(APP_OBJ)) build/shots/netdrv.o build/shots/splash.o
 
-$(SBIN): $(filter-out build/net.o,$(call obj,$(APP) $(COMMON))) build/feeds.o build/shots/net.o $(CFG)
-	$(CL65) -t $(TARGET) -C $(CFG) -o $@ $(filter-out build/net.o,$(call obj,$(APP) $(COMMON))) build/feeds.o build/shots/net.o
+$(SBIN): $(SAPP_OBJ) $(APPCFG)
+	$(CL65) -t $(TARGET) -C $(APPCFG) -o $@ $(SAPP_OBJ)
 
 shotsdisk: $(SDISK)
 
@@ -197,61 +261,6 @@ run: $(DISK)
 	tools/vii.sh boot $(DISK)
 	tools/vii.sh await NEWSIIE 30
 	tools/vii.sh screen
-
-# ---- the FujiNet build ----
-#
-# The objects that do not differ are the CoGS build's own; only splash.c
-# (which names the edition and the commit) and the probe are compiled
-# apart, so the two builds can be made in either order without cleaning.
-
-FBIN    = build/fujinet/NEWSIIE.SYSTEM
-FFTBIN  = build/fujinet/FETCH.SYSTEM
-FDISK   = build/fujinet/NEWSIIE.po
-FTDISK  = build/fujinet/NEWSIIE-TEST.po
-FDEFS   = -DNEWSIIE_FUJINET -DNEWSIIE_BUILD='" $(GITREV)"'
-# make fujinettestdisk PROBE_HOST=192.168.1.2:8000 adds two probe tests that
-# fetch from a test server there (a bench aid; see PLAN.md section 12).
-ifdef PROBE_HOST
-FDEFS  += -DPROBE_HOST='"$(PROBE_HOST)"'
-endif
-
-# The commit (with + when src/ has changes not committed), rewritten only
-# when it changes, so splash.o and the probe follow it.
-GITREV := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)$(shell git diff --quiet HEAD -- src 2>/dev/null || echo +)
-
-build/fujinet/rev: FORCE | build/fujinet
-	@[ "$$(cat $@ 2>/dev/null)" = "$(GITREV)" ] || echo "$(GITREV)" > $@
-
-build/fujinet/%.o: src/%.c build/fujinet/rev $(HDRS) tools/cc65check.py | build/fujinet
-	$(CL65) -t $(TARGET) $(COPT) $(FDEFS) -S -o build/fujinet/$*.s $<
-	python3 -I tools/cc65check.py build/fujinet/$*.s > /dev/null || python3 -I tools/cc65check.py build/fujinet/$*.s
-	$(CL65) -t $(TARGET) -c -o $@ build/fujinet/$*.s
-
-FAPP_OBJ   = $(call obj,$(APP_CORE) $(BASE) $(FUJI) src/net_fuji.c src/src_fuji.c) build/feeds.o build/fujinet/splash.o
-FFETCH_OBJ = build/fujinet/fnfetch.o $(call obj,src/disk.s $(PARSER) $(BASE) $(FUJI))
-
-fujinet: $(FBIN) $(FFTBIN)
-
-$(FBIN): $(FAPP_OBJ) $(CFG) tools/memcheck.py
-	$(CL65) -t $(TARGET) -C $(CFG) -m build/fujinet/newsiie.map -Ln build/fujinet/newsiie.lbl -o $@ $(FAPP_OBJ)
-	@echo "FujiNet NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
-	@python3 -I tools/memcheck.py build/fujinet/newsiie.map $(CFG) || { rm -f $@; exit 1; }
-
-$(FFTBIN): $(FFETCH_OBJ) $(CFG)
-	$(CL65) -t $(TARGET) -C $(CFG) -m build/fujinet/fetch.map -Ln build/fujinet/fetch.lbl -o $@ $(FFETCH_OBJ)
-	@echo "FujiNet FETCH.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
-
-fujinetdisk: $(FDISK)
-
-$(FDISK): $(FBIN) $(FFTBIN) tools/mkdisk.sh cfg/NEWSIIE.FEEDS
-	tools/mkdisk.sh $(FDISK) $(FBIN) $(FFTBIN)
-	tools/ac -ptx $(FDISK) NEWSIIE.FEEDS < cfg/NEWSIIE.FEEDS
-
-fujinettestdisk: $(FTDISK)
-
-$(FTDISK): $(FBIN) $(FFTBIN) tools/mkdisk.sh tests/NEWSIIE.FEEDS
-	tools/mkdisk.sh $(FTDISK) $(FBIN) $(FFTBIN)
-	tools/ac -ptx $(FTDISK) NEWSIIE.FEEDS < tests/NEWSIIE.FEEDS
 
 HOST_COGS = src/cogs.c src/cogs_extra.c src/fmt.c src/fmt_extra.c
 

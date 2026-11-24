@@ -1,13 +1,8 @@
 #include "screen.h"
 #include "ui.h"
 
-/* The FujiNet build says so, with the commit it was built from (Makefile),
- * so a test can tell which build booted. */
-#ifdef NEWSIIE_FUJINET
-#define EDITION " for FujiNet"
-#else
-#define EDITION ""
-#endif
+/* The commit it was built from (Makefile), so a test, or a bug report, can
+ * tell which build booted. */
 #ifndef NEWSIIE_BUILD
 #define NEWSIIE_BUILD ""
 #endif
@@ -27,7 +22,7 @@ void splash_show(void)
     row_center(8, " NEWSIIE ", 1);
     row_center(9, "         ", 1);
     row_center(11, "A news reader for the Apple //e", 0);
-    row_center(17, "Version " NEWSIIE_VERSION EDITION, 0);
+    row_center(17, "Version " NEWSIIE_VERSION, 0);
     if (NEWSIIE_BUILD[0]) {
         row_center(19, "Build" NEWSIIE_BUILD, 0);
     }

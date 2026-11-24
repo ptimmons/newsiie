@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """memcheck.py map cfg -- fail if a program leaves too little heap.
 
-The heap runs from the end of BSS to the bottom of the C stack. Opening a
+The heap runs from the end of BSS to the bottom of the C stack (in the
+app, to the network driver slot under it: cfg/newsiie-app.cfg). Opening a
 file through cc65 takes a 1K ProDOS buffer from it, aligned to a 256-byte
 page: up to 1024 + 255 bytes, plus the allocator's own few. With less, the
 open fails with no ProDOS error at all, and the feed list silently does not
@@ -25,9 +26,13 @@ def main():
     s = re.search(r"__STACKSIZE__:.*value\s*=\s*\$([0-9A-Fa-f]+)", open(cfg).read())
     stack = int(s.group(1), 16)
     heap = STACK_TOP - stack - bss_end
+    # The app's cfg counts the network driver slot in __STACKSIZE__.
+    d = re.search(r"__DRVSIZE__:.*value\s*=\s*\$([0-9A-Fa-f]+)", open(cfg).read())
+    below = f"driver slot at ${STACK_TOP - stack:04X}, stack at ${STACK_TOP - stack + int(d.group(1), 16):04X}" \
+        if d else f"stack at ${STACK_TOP - stack:04X}"
     status = "ok" if heap >= NEED else "TOO SMALL"
-    print(f"memcheck: {heap} bytes of heap (BSS ends ${bss_end:04X}, stack at "
-          f"${STACK_TOP - stack:04X}); opening a file needs {NEED}: {status}")
+    print(f"memcheck: {heap} bytes of heap (BSS ends ${bss_end:04X}, {below}); "
+          f"opening a file needs {NEED}: {status}")
     return 0 if heap >= NEED else 1
 
 

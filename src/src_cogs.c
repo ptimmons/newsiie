@@ -1,9 +1,10 @@
 /*
  * Fetching from the network through the CoGS card's byte streams: the
- * CoGS build's half of source.h.
+ * CoGS driver's half of source.h, in NEWSIIE.COGS (netdrv.h).
  */
 #include <string.h>
 #include "source.h"
+#include "netdrv.h"
 #include "cogs.h"
 #include "feed.h"
 #include "xml.h"
@@ -17,7 +18,7 @@
 static uint8_t  stopping;           /* Esc while a reply was awaited */
 static uint16_t wait_start;
 
-const char *source_net_error(uint8_t rc)
+const char *cogs_net_error(uint8_t rc)
 {
     if (rc == COGS_E_REFUSED) {
         return "THE SERVER REFUSED IT (OR NOT FOUND)";
@@ -92,7 +93,7 @@ static uint32_t card_uptime(void)
     return cogs_netstat(&ns) || !ns.has_uptime ? 0 : ns.uptime;
 }
 
-uint8_t source_stream(const char *url)
+uint8_t cogs_stream(const char *url)
 {
     cogs_chunk_t c;
     uint16_t quiet = 0;

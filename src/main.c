@@ -1,6 +1,6 @@
 /*
  * newsiie -- an RSS and Atom reader for the Enhanced Apple //e, with the
- * network done by a CoGS card.
+ * network done by a CoGS card or a FujiNet (netdrv.h).
  */
 #include <apple2.h>
 #include <stdint.h>
@@ -11,9 +11,14 @@
 #include "readset.h"
 #include "fmt.h"
 #include "ui.h"
+#include "netdrv.h"
 
 extern const char *feeds_note;
+/* In LOWBSS (not cleared at startup): written before it is used. Main
+ * memory is short (cfg/newsiie-app.cfg). */
+#pragma bss-name (push, "LOWBSS")
 static char note[40];
+#pragma bss-name (pop)
 
 /* Before the 80-column screen is known to exist: a message on the
  * 40-column screen, written straight to page 1. */
@@ -59,6 +64,7 @@ int main(void)
     }
     rs_load();
     store_is_read = rs_has;
+    net_init();                 /* load the driver for the card there */
     net_check();                /* while the splash is up */
     key_get();                  /* consumed: it must not act on the view */
 

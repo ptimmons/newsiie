@@ -17,7 +17,11 @@ uint8_t  source_rc;
 uint16_t source_secs;
 
 uint8_t source_buf[SOURCE_BUF];
+/* In LOWBSS (not cleared at startup): always written before it is shown.
+ * Main memory is short (cfg/newsiie-app.cfg). */
+#pragma bss-name (push, "LOWBSS")
 char    source_msg[48];
+#pragma bss-name (pop)
 
 static uint16_t nchunks;
 

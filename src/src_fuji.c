@@ -1,6 +1,6 @@
 /*
  * Fetching from the network through the FujiNet's N: device: the FujiNet
- * build's half of source.h.
+ * driver's half of source.h, in NEWSIIE.FUJI (netdrv.h).
  *
  * Every SmartPort call runs to its end; nothing can cut one short. The
  * first STATUS after an open is the one that waits for the server (DNS,
@@ -8,6 +8,7 @@
  * returns: the keyboard holds the key until we look.
  */
 #include "source.h"
+#include "netdrv.h"
 #include "fuji.h"
 #include "feed.h"
 #include "xml.h"
@@ -18,7 +19,7 @@
 
 static uint8_t last_err;            /* fuji_err when the fetch ended */
 
-const char *source_net_error(uint8_t rc)
+const char *fuji_net_error(uint8_t rc)
 {
     fuji_err = last_err;            /* other calls since may have reset it */
     return fuji_strerror(rc);
@@ -93,7 +94,7 @@ static uint8_t pull(void)
     }
 }
 
-uint8_t source_stream(const char *url)
+uint8_t fuji_stream(const char *url)
 {
     fuji_status_t st;
     uint8_t rc;

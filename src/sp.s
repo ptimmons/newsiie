@@ -20,7 +20,12 @@
 LCRAM           = $C080         ; read LC RAM bank 2, no write
 LCROM           = $C082         ; read ROM, no write
 
+; In NEWSIIE.FUJI (netdrv.h) the segments are the FujiNet driver's.
+.ifdef NETDRV
+        .segment "FUJIBSS"
+.else
         .bss
+.endif
 
 ; The parameter list. fuji.c fills it: count, unit, buffer, then the
 ; command's own fields (a status or control code, or a byte count and a
@@ -29,7 +34,11 @@ _sp_parms:      .res    9
 _sp_count:      .res    2
 _sp_raw_a:      .res    1       ; A as the card returned it
 
+.ifdef NETDRV
+        .segment "FUJICODE"
+.else
         .code
+.endif
 
 ; void __fastcall__ sp_set_entry(unsigned int entry)
 _sp_set_entry:

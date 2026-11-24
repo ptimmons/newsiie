@@ -31,18 +31,21 @@ make run               # boot it in Virtual ][ and print the screen
 make host-test         # card protocol, text cleaner and feed fixtures, on the Mac
 make corpus            # the parser against ten live feeds
 make release           # build/newsiie-<version>.zip: the disk and the manual
-make fujinetdisk       # build/fujinet/NEWSIIE.po: the FujiNet build
 ```
 
-## The FujiNet build
+## CoGS card or FujiNet
 
-`make fujinetdisk` builds the same reader with a FujiNet in place of the
-CoGS card, through newsiie's own SmartPort driver (`src/fuji.c`), and a
-FujiNet `FETCH.SYSTEM` that checks the device. Set up the FujiNet's Wi-Fi
-in its CONFIG first. It is not finished: it reads feeds through a LIRON
-card, but a Yellowstone card refuses the SmartPort READ the network
-device needs. See
-[PLAN.md](PLAN.md) section 12.
+One disk serves both. At startup `NEWSIIE.SYSTEM` loads its network
+driver from the disk, `NEWSIIE.COGS` if a CoGS card is installed, else
+`NEWSIIE.FUJI` if a FujiNet is, into one slot of memory under the C stack
+(`src/netdrv.h`, `cfg/newsiie-app.cfg`). The FujiNet driver is newsiie's
+own SmartPort code (`src/fuji.c`), and `FNFETCH.SYSTEM` checks the device.
+Set up the FujiNet's Wi-Fi in its CONFIG first.
+
+FujiNet support is not finished: it reads feeds through a LIRON card, but
+a Yellowstone card refuses the SmartPort READ the network device needs,
+and with FujiNet firmware v1.6.1 a large feed can still reboot the
+FujiNet mid-fetch, which hangs the //e. See [PLAN.md](PLAN.md) section 12.
 
 ## Layout
 

@@ -46,9 +46,9 @@ extern uint8_t  sp_raw_a;       /* A as the card left it, for the probe */
  * piece of the response at a time. A READ for more than that piece's rest
  * makes it wait on the network inside the SmartPort call. With firmware
  * v1.6.1 on the bench, 512-byte reads of large feeds from the internet
- * ended the transfer early, and sometimes rebooted the FujiNet in the
- * middle of the call, which hangs the //e; 256 and 64 did not (PLAN.md
- * section 12). */
+ * always ended the transfer early, often rebooting the FujiNet in the
+ * middle of the call, which hangs the //e. 256 made that rare, not
+ * impossible: the cure is firmware PR #1586 (PLAN.md section 12). */
 #define FUJI_READ_MAX   256
 
 /* The network device's own codes (fuji_err for FN_E_NET). */

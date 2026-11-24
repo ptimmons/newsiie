@@ -830,7 +830,8 @@ Open:
 
 The probe now redraws a line before every SmartPort call (which call,
 reads, bytes, waiting, bytes asked), and has P (parse on/off) and C (READ
-size 256/64/512). `make fujinettestdisk PROBE_HOST=ip:port` adds two
+size 256/64/512). `make fujinettestdisk PROBE_HOST=ip:port` (now `make testdisk
+PROBE_HOST=ip:port`, for FNFETCH) adds two
 tests that fetch from a test server on the bench Mac.
 
 - With 512-byte READs, CNN over the internet died partway every time: at
@@ -852,5 +853,44 @@ tests that fetch from a test server on the bench Mac.
   notifies a task that is gone, which asserts and reboots the ESP32.
   Firmware PR #1586 (after v1.6.1) fixes that crash; smaller READs avoid
   most of the waiting either way.
-- With 256, the app fetched CNN whole on the //e: 50 items, 127K.
+- With 256, the app fetched CNN whole on the //e: 50 items, 127K. But
+  256 is not a cure: later the same day (the one-disk build below, same
+  driver code) CNN stopped at 96K with the FujiNet rebooting, so 256 makes
+  the crash rarer, not impossible. The fix is the firmware's (#1586);
+  until a release carries it, a FujiNet on v1.6.1 can hang on big feeds.
+
+### One disk for both: the network driver loaded at startup, 2026-11-24
+
+PT asked for one build that picks the network at runtime. The app's
+three calls into the network (net_check, source_stream,
+source_net_error) now go through a table at the start of a driver slot,
+$0FD0 bytes under the 512-byte C stack (cfg/newsiie-app.cfg, which counts
+the slot in __STACKSIZE__ so cc65's heap stops below it). Each driver is
+linked with the app, so it calls the app freely, but into its own file
+(the COGS* and FUJI* segments): NEWSIIE.COGS ($FCD with its BSS, the
+larger) and NEWSIIE.FUJI. netdrv.c loads NEWSIIE.COGS and calls its find;
+if no CoGS card, NEWSIIE.FUJI the same way; if neither, the status bar
+says NO NETWORK CARD and fetches say NO COGS CARD OR FUJINET FOUND. A
+table carries a stamp (the app's __ONCE_RUN__ as linked), so a driver
+from another build is refused. tools/drvcheck.sh fails the build if the
+app imports a driver's symbol or one driver imports the other's.
+
+Memory: the CoGS build had 1,442 bytes of heap (147 over the 1,295 a
+file open needs). The slot costs what the CoGS code did, plus the loader
+and table (about 150 bytes, after a first C version with function
+pointers cost 471). To make room, ui.c's code moved into language-card
+RAM and two buffers always written before use (main.c's note,
+source_msg) into LOWBSS. The heap is 1,329: 34 bytes over. Anything new
+in main memory now needs room found for it first.
+
+The separate FujiNet build is gone: one `make disk` carries NEWSIIE.SYSTEM,
+both drivers, PROBE, FETCH and FNFETCH (the FujiNet probe, was the FujiNet
+build's FETCH.SYSTEM). The splash shows the build's commit.
+
+Tested: in Virtual ][ (no card), both drivers load and find nothing, the
+status bar says NO NETWORK CARD, a disk feed loads, a story saves and
+NEWSIIE.READ is written. On the //e through the LIRON, NEWSIIE.FUJI loads
+(FUJINET 172.16.16.10 on the status bar) and fetched BBC News (32 items)
+and Hacker News (20); CNN hit the firmware crash above at 96K. The CoGS
+path is untested on hardware: PT will put the CoGS card back in.
 
