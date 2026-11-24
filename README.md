@@ -31,7 +31,18 @@ make run               # boot it in Virtual ][ and print the screen
 make host-test         # card protocol, text cleaner and feed fixtures, on the Mac
 make corpus            # the parser against ten live feeds
 make release           # build/newsiie-<version>.zip: the disk and the manual
+make fujinetdisk       # build/fujinet/NEWSIIE.po: the FujiNet build
 ```
+
+## The FujiNet build
+
+`make fujinetdisk` builds the same reader with a FujiNet in place of the
+CoGS card, through newsiie's own SmartPort driver (`src/fuji.c`), and a
+FujiNet `FETCH.SYSTEM` that checks the device. Set up the FujiNet's Wi-Fi
+in its CONFIG first. It is not finished: it reads feeds through a LIRON
+card, but a Yellowstone card refuses the SmartPort READ the network
+device needs. See
+[PLAN.md](PLAN.md) section 12.
 
 ## Layout
 

@@ -10,6 +10,11 @@
 #   make host-test  the C that has no Apple dependencies, run on the Mac:
 #                   card protocol, cleaner, and the feed fixtures
 #   make corpus     the parser on real feeds (tools/getcorpus.sh fetches them)
+#   make fujinet    the FujiNet build, under build/fujinet/: the same app with
+#                   the FujiNet's network device in place of the CoGS card,
+#                   and a FujiNet FETCH.SYSTEM
+#   make fujinetdisk      build/fujinet/NEWSIIE.po, carrying both
+#   make fujinettestdisk  build/fujinet/NEWSIIE-TEST.po: with feeds from /FEEDS
 #   make clean
 
 TARGET  = apple2enh
@@ -19,17 +24,28 @@ CFG     = cfg/newsiie.cfg
 # -Oirs, and the hot loops are assembly anyway); -Cl: static locals
 COPT    = -Or -Cl
 
-# Shared by the app and the probe.
-COMMON = \
+# Shared by every program, in both builds.
+BASE = \
 	src/screen.c \
 	src/kbd.c \
 	src/status.c \
 	src/tick.c \
 	src/fmt.c \
+	src/blit.s
+
+# The CoGS card.
+COGS = \
 	src/cogs.c \
 	src/slot.c \
-	src/blit.s \
 	src/cogs_io.s
+
+# Shared by the CoGS app and its probes.
+COMMON = $(BASE) $(COGS)
+
+# The FujiNet, over SmartPort.
+FUJI = \
+	src/fuji.c \
+	src/sp.s
 
 # The feed parser. Plain C but for scan.s, whose twin on the Mac is
 # scan_host.c.
@@ -40,12 +56,11 @@ PARSER = \
 	src/scan_tab.c \
 	src/scan.s
 
-# The app. (feeds.c is named in the link rule.)
-APP = \
+# The app, either build. (feeds.c is named in the link rule; splash.c
+# differs between the builds.)
+APP_CORE = \
 	src/main.c \
-	src/splash.c \
 	src/help.c \
-	src/net.c \
 	src/ui.c \
 	src/heads.c \
 	src/article.c \
@@ -58,6 +73,9 @@ APP = \
 	src/source.c \
 	src/auxmem.s \
 	$(PARSER)
+
+# The CoGS app.
+APP = $(APP_CORE) src/splash.c src/net.c src/src_cogs.c
 
 PROBE = \
 	src/probe.c \
@@ -81,11 +99,12 @@ DISK  = build/NEWSIIE.po
 HOST_CC     = cc
 HOST_CFLAGS = -std=c99 -Wall -Wextra -Werror -Isrc
 
-.PHONY: all disk testdisk feedsdisk shotsdisk shots run release host-test corpus clean
+.PHONY: all disk testdisk feedsdisk shotsdisk shots run release host-test corpus clean \
+	fujinet fujinetdisk fujinettestdisk FORCE
 
 all: $(BIN) $(PRBIN) $(FTBIN)
 
-build build/host build/test build/asm build/shots:
+build build/host build/test build/asm build/shots build/fujinet:
 	mkdir -p $@
 
 # C goes through assembly so tools/cc65check.py can look at it: this cc65
@@ -178,6 +197,61 @@ run: $(DISK)
 	tools/vii.sh boot $(DISK)
 	tools/vii.sh await NEWSIIE 30
 	tools/vii.sh screen
+
+# ---- the FujiNet build ----
+#
+# The objects that do not differ are the CoGS build's own; only splash.c
+# (which names the edition and the commit) and the probe are compiled
+# apart, so the two builds can be made in either order without cleaning.
+
+FBIN    = build/fujinet/NEWSIIE.SYSTEM
+FFTBIN  = build/fujinet/FETCH.SYSTEM
+FDISK   = build/fujinet/NEWSIIE.po
+FTDISK  = build/fujinet/NEWSIIE-TEST.po
+FDEFS   = -DNEWSIIE_FUJINET -DNEWSIIE_BUILD='" $(GITREV)"'
+# make fujinettestdisk PROBE_HOST=192.168.1.2:8000 adds two probe tests that
+# fetch from a test server there (a bench aid; see PLAN.md section 12).
+ifdef PROBE_HOST
+FDEFS  += -DPROBE_HOST='"$(PROBE_HOST)"'
+endif
+
+# The commit (with + when src/ has changes not committed), rewritten only
+# when it changes, so splash.o and the probe follow it.
+GITREV := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)$(shell git diff --quiet HEAD -- src 2>/dev/null || echo +)
+
+build/fujinet/rev: FORCE | build/fujinet
+	@[ "$$(cat $@ 2>/dev/null)" = "$(GITREV)" ] || echo "$(GITREV)" > $@
+
+build/fujinet/%.o: src/%.c build/fujinet/rev $(HDRS) tools/cc65check.py | build/fujinet
+	$(CL65) -t $(TARGET) $(COPT) $(FDEFS) -S -o build/fujinet/$*.s $<
+	python3 -I tools/cc65check.py build/fujinet/$*.s > /dev/null || python3 -I tools/cc65check.py build/fujinet/$*.s
+	$(CL65) -t $(TARGET) -c -o $@ build/fujinet/$*.s
+
+FAPP_OBJ   = $(call obj,$(APP_CORE) $(BASE) $(FUJI) src/net_fuji.c src/src_fuji.c) build/feeds.o build/fujinet/splash.o
+FFETCH_OBJ = build/fujinet/fnfetch.o $(call obj,src/disk.s $(PARSER) $(BASE) $(FUJI))
+
+fujinet: $(FBIN) $(FFTBIN)
+
+$(FBIN): $(FAPP_OBJ) $(CFG) tools/memcheck.py
+	$(CL65) -t $(TARGET) -C $(CFG) -m build/fujinet/newsiie.map -Ln build/fujinet/newsiie.lbl -o $@ $(FAPP_OBJ)
+	@echo "FujiNet NEWSIIE.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
+	@python3 -I tools/memcheck.py build/fujinet/newsiie.map $(CFG) || { rm -f $@; exit 1; }
+
+$(FFTBIN): $(FFETCH_OBJ) $(CFG)
+	$(CL65) -t $(TARGET) -C $(CFG) -m build/fujinet/fetch.map -Ln build/fujinet/fetch.lbl -o $@ $(FFETCH_OBJ)
+	@echo "FujiNet FETCH.SYSTEM: $$(($$(wc -c < $@) - 58)) bytes"
+
+fujinetdisk: $(FDISK)
+
+$(FDISK): $(FBIN) $(FFTBIN) tools/mkdisk.sh cfg/NEWSIIE.FEEDS
+	tools/mkdisk.sh $(FDISK) $(FBIN) $(FFTBIN)
+	tools/ac -ptx $(FDISK) NEWSIIE.FEEDS < cfg/NEWSIIE.FEEDS
+
+fujinettestdisk: $(FTDISK)
+
+$(FTDISK): $(FBIN) $(FFTBIN) tools/mkdisk.sh tests/NEWSIIE.FEEDS
+	tools/mkdisk.sh $(FTDISK) $(FBIN) $(FFTBIN)
+	tools/ac -ptx $(FTDISK) NEWSIIE.FEEDS < tests/NEWSIIE.FEEDS
 
 HOST_COGS = src/cogs.c src/cogs_extra.c src/fmt.c src/fmt_extra.c
 
