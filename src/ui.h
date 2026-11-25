@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define NEWSIIE_VERSION "1.0"
+#define NEWSIIE_VERSION "1.1"
 
 #define V_FEEDS     0
 #define V_HEADS     1

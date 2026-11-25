@@ -1,10 +1,11 @@
 # Newsiie
 
 An RSS and Atom news reader for the Enhanced Apple //e, with the network
-done by a [CoGS](https://a2cogs.com) card. Written in cc65 C with ca65
-assembly for the screen.
+done by a [CoGS](https://a2cogs.com) card or a FujiNet. Written in cc65 C
+with ca65 assembly for the screen.
 
-Version 1.0: all eight milestones of [PLAN.md](PLAN.md) are built. Pick a
+Version 1.1: all eight milestones of [PLAN.md](PLAN.md) are built, and one
+disk now works with a CoGS card or a FujiNet. Pick a
 feed, read its headlines and summaries, add and delete feeds, keep track
 of what you have read, and save articles for ZipEdit. See
 [the manual](docs/MANUAL.md).
