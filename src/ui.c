@@ -5,6 +5,10 @@
 #include "kbd.h"
 #include "ui.h"
 
+/* In language-card RAM, with article.c's code: main memory is short
+ * (cfg/newsiie-app.cfg). Nothing here calls ProDOS. */
+#pragma code-name ("LC")
+
 const char *cur_name;
 const char *cur_url;
 

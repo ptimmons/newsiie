@@ -14,6 +14,8 @@ boots from the CoGS network disk, so the card is up first). `make release`
 builds `build/newsiie-1.0.zip`: the disk image, docs/MANUAL.md and its
 pictures.
 
+The [FujiNet implementation plan](#12-fujinet-port) is ready for review.
+
 Sources read for this plan: `~/repos/zipedit` (CLAUDE.md, docs/design.md,
 lang/en.txt, src layout, reference screenshots), the CoGS Technical Reference
 (firmware 1.39, rev 33) chapters 2–5, 8, 9, 12 and Appendix A, and the CoGS
@@ -679,3 +681,232 @@ This milestone added what a live network needs:
   It went from 768 to 512 bytes; the heap stands at 1,434 (1,295 needed).
 - **Lowercase names:** a name typed at SAVE AS with lowercase letters gave
   $40 (ProDOS 2.4 wants uppercase). The Article view now uppercases it.
+
+## 12. FujiNet port
+
+The first target is the Enhanced Apple //e with 128K, 80-column text,
+ProDOS 8, and FujiNet connected through a compatible SmartPort interface.
+The goal is a bootable FujiNet build of Newsiie that reads RSS and Atom
+over HTTP and HTTPS and accepts the existing `NEWSIIE.FEEDS` file,
+including its plain URLs and local ProDOS paths. Configure Wi-Fi using
+FujiNet CONFIG before running Newsiie. Start testing with a local writable
+ProDOS volume, then test a writable SmartPort image mounted from the
+FujiNet SD card. [FujiNet Apple II setup guide](https://github.com/FujiNetWIFI/fujinet-firmware/wiki/Apple-II-%26-III-FujiNet-Quickstart-Guide)
+
+### 1. Prove the transport with a fetch probe
+
+- Build a FujiNet version of `FETCH.SYSTEM` using a pinned Apple II cc65
+  release of `fujinet-lib`. Reuse the current probe's test cases and
+  streaming parser. Start with a firmware release that includes the
+  streamed HTTP GET fix shipped in v1.6.0. Record the exact firmware,
+  library, SmartPort interface and slot used in each hardware run.
+  [Library and release instructions](https://github.com/FujiNetWIFI/fujinet-lib) ·
+  [HTTP examples](https://github.com/FujiNetWIFI/fujinet-lib-examples/tree/main/network/httpbin) ·
+  [Firmware release notes](https://github.com/FujiNetWIFI/fujinet-firmware/releases/tag/v1.6.0)
+- Discover the network unit by probing SmartPort devices. Build the
+  FujiNet device spec from the feed URL at open time, with room for
+  `N:`, all 127 URL characters, and the terminator. Request a read-only
+  stream with byte translation disabled. Poll for available bytes and
+  read at most 512 bytes at a time. Confirm how the chosen firmware reports
+  temporary empty reads, EOF with bytes still buffered, and errors.
+  Record raw device results in the probe.
+  [Apple II network device implementation](https://github.com/FujiNetWIFI/fujinet-firmware/blob/master/lib/device/iwm/network.cpp)
+- On hardware, check the byte count and first parsed titles against known
+  RSS and Atom fixtures served over HTTP and HTTPS. Include a redirect, a
+  404, a response larger than 64 KiB, and a delayed response. Check for raw
+  XML, record what happens with a compressed response, and verify the
+  firmware's certificate handling before documenting HTTPS behavior.
+  Measure how long SmartPort calls can block. Cancel during a wait and
+  during a transfer, fetch again, and read the boot volume afterward.
+
+### 2. Wire the transport into Newsiie
+
+- Use `src/source.c` as the boundary. Keep parser setup and finalization,
+  the local-file path, progress reporting, and the item store shared.
+  Put device discovery, open/read/close, and device error mapping behind
+  build-selected code. Keep the CoGS wait and clock handling with the
+  CoGS implementation. Update the FujiNet status field to distinguish a
+  missing device, an unavailable network, and a ready device.
+- Drain buffered data before treating EOF as success, and report a
+  transport failure separately from invalid XML. Close the stream after
+  EOF, Esc, timeout, error, or parser early stop. Keep items already
+  delivered on Esc and poll for Esc between SmartPort calls. Use the
+  probe's measured blocking behavior to decide what cancellation wording
+  the app can support. Close before returning to any ProDOS file work.
+- Add `make fujinet` and `make fujinetdisk` targets with variant-specific
+  objects, maps, and output under `build/fujinet/`. Package
+  `build/fujinet/NEWSIIE.po` with `NEWSIIE.SYSTEM`, the FujiNet
+  `FETCH.SYSTEM`, and the normal feed list. Keep CoGS as the default
+  build. Verify with both targets built in either order, without cleaning.
+- Run `tools/memcheck.py` on both linked apps. The current CoGS map shows
+  1,496 bytes of heap against a 1,295-byte minimum. Measure the FujiNet
+  build after removing the CoGS objects, and check the SmartPort buffer,
+  zero-page usage, and stack depth during fetch and file I/O. If the
+  library exceeds the available space, inspect which routines the link
+  pulls in and evaluate a smaller SmartPort driver before changing the
+  app's memory limits.
+
+### 3. Verify and package
+
+- Run `make host-test` and boot both variants in an emulator for the
+  local-file and missing-device paths. On real FujiNet hardware, run the
+  probe cases through the app as well. Check that a dropped connection
+  produces an error and that a subsequent refresh works. Exercise parser
+  early stop with a feed that fills the item store.
+- On both the local writable volume and the writable FujiNet-mounted
+  image, edit the feed list, mark an item read, and save an article larger
+  than 512 bytes after a network fetch. Reboot and verify the saved data.
+  Check the error path on a read-only image.
+- Document the tested hardware, firmware, setup, and any observed HTTP
+  or cancellation limitations. The proposed library is GPLv3, so settle
+  distribution before packaging. A release linked to it needs GPLv3
+  compliance for the combined build, including corresponding source.
+  If an MIT-only FujiNet build is required, use the probe to validate the
+  protocol and implement the needed SmartPort calls independently.
+  [Library license](https://github.com/FujiNetWIFI/fujinet-lib/blob/main/LICENSE) ·
+  [GNU GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html#GPLStaticVsDynamic)
+
+After review, start milestone 1 in a separate worktree on
+`codex/fujinet`. The probe results will determine the supported firmware
+baseline and whether the library fits the app.
+
+### Progress, 2026-11-23
+
+Built on `main` instead of a worktree, and without fujinet-lib: newsiie
+has its own small SmartPort driver (`src/sp.s`, `src/fuji.c`), written
+from the firmware's protocol, so the FujiNet build stays MIT and the GPL
+question does not arise. `src/source.c` keeps the shared half;
+`src_cogs.c` and `src_fuji.c` are the two network halves, and
+`net_fuji.c` gives the status field (`NO FUJINET`, `FUJINET NO WI-FI`,
+`FUJINET 172.16.16.10`). `make fujinet` / `make fujinetdisk` build
+`build/fujinet/NEWSIIE.po` with the app and a FujiNet `FETCH.SYSTEM`
+(seven test URLs, raw device results, a boot-volume read, and `X`, a
+READ experiment). The FujiNet app leaves 2,855 bytes of heap (1,295
+needed); the CoGS build went from 1,496 to 1,442 with the split.
+
+Virtual ][ (no FujiNet): both builds boot, local feed files load, and
+the network path reports `NO FUJINET FOUND`; the probe fails each test
+cleanly and reads the boot volume.
+
+Bench (FujiNet firmware v1.6.1 on a Yellowstone card in slot 6, booted
+from a read/write TNFS image): the driver finds NETWORK (unit 12) and
+THE_FUJI (unit 13), reads Wi-Fi state, the firmware version and the
+address, opens an HTTPS URL, and STATUS reports 512 bytes waiting. But
+every SmartPort READ ($08) is refused by the card with $04 (carry set,
+X=4), whether the parameter count is 4 or 5, the byte count 1, 64 or
+512, and also after a SmartPort OPEN ($06), which is refused the same
+way. The v1.6.1 firmware answers its own errors with $27 or $01, so the
+refusal comes from the Yellowstone's firmware, which seems to pass only
+STATUS and CONTROL (and the block calls) to a character device. v1.6.1
+has no other way to fetch data (STATUS 'R' is empty there). So no feed
+has been fetched over the FujiNet yet; newsiie now says "THIS SMARTPORT
+CARD CANNOT READ FROM THE FUJINET ($04)" for it.
+
+Next: run the probe through a SmartPort interface that passes READ on
+(a Liron or UniDisk 3.5 card, or a //c), or with a newer Yellowstone
+firmware if one adds character devices; then the rest of 1 and 3.
+
+LIRON card in slot 5, same FujiNet (v1.6.1), read/write TNFS image,
+same build: READ works with 4 or 5 parameters (the driver keeps 4).
+Probe: https 15,980 bytes PASS (20 items); http-to-https redirect PASS;
+404 gives device error 170 (newsiie says "refused (or not found)");
+Ars Technica 75,244 bytes PASS (28 items); httpbin delay/5 returns its
+280 bytes; the boot volume reads fine after each fetch. The app fetched
+Hacker News (20 items, 16K) and BBC News (31 items, 23K), saved a story
+(THEPOWEROFGR.MD), and wrote NEWSIIE.READ on quit, all on the
+FujiNet-mounted disk.
+
+Open:
+- Large feeds: fixed on the bench 2026-11-24 by asking for at most 256
+  bytes per READ (FUJI_READ_MAX, fuji.h). See "Large-feed hang" below.
+- Right after a cold boot the first fetch said "NO NETWORK" though the
+  adapter reported Wi-Fi; the second worked. Wait or retry once.
+- A warm reboot (Ctrl-Open-Apple-Reset) with the LIRON stops at the
+  "Apple //e" banner; `a2h fujinet --boot --cold` works.
+- The probe eats any key while it watches for Esc, so queued test
+  numbers are lost.
+
+### Large-feed hang, 2026-11-24
+
+The probe now redraws a line before every SmartPort call (which call,
+reads, bytes, waiting, bytes asked), and has P (parse on/off) and C (READ
+size 256/64/512). `make fujinettestdisk PROBE_HOST=ip:port` (now `make testdisk
+PROBE_HOST=ip:port`, for FNFETCH) adds two
+tests that fetch from a test server on the bench Mac.
+
+- With 512-byte READs, CNN over the internet died partway every time: at
+  54K inside READ 107 with the FujiNet rebooting under it (its web page's
+  uptime went back to 0), so the LIRON waits forever; and with parsing off,
+  at 75K with READ returning $27 while STATUS said 512 waiting,
+  connected 0.
+- Not the parser: the 6502 build reads the same 127K from disk. Not the
+  servers: CNN, NASA and Ars all send whole to a Mac reading at 2.5K/s
+  through a 4K window. Not chunking or CNN's bytes: the same response
+  replayed from the Mac (its headers and 32K chunks) arrives whole at 512.
+  Not time: 64-byte READs ran six minutes and got all 130,144 bytes.
+- 256 and 64 both arrived whole from the internet; 512 never did.
+- Why, from the v1.6.1 source: for HTTP, "waiting" is the body length
+  still to come (content or chunk length minus bytes read), not data in
+  hand. fnHttpClient holds one 512-byte piece; a READ for more than its
+  rest waits on the network inside the SmartPort call, and if the HTTP
+  task ends while read() is waiting, read() hands back stale data and
+  notifies a task that is gone, which asserts and reboots the ESP32.
+  Firmware PR #1586 (after v1.6.1) fixes that crash; smaller READs avoid
+  most of the waiting either way.
+- With 256, the app fetched CNN whole on the //e: 50 items, 127K. But
+  256 is not a cure: later the same day (the one-disk build below, same
+  driver code) CNN stopped at 96K with the FujiNet rebooting, so 256 makes
+  the crash rarer, not impossible. The fix is the firmware's (#1586);
+  until a release carries it, a FujiNet on v1.6.1 can hang on big feeds.
+
+### One disk for both: the network driver loaded at startup, 2026-11-24
+
+PT asked for one build that picks the network at runtime. The app's
+three calls into the network (net_check, source_stream,
+source_net_error) now go through a table at the start of a driver slot,
+$0FD0 bytes under the 512-byte C stack (cfg/newsiie-app.cfg, which counts
+the slot in __STACKSIZE__ so cc65's heap stops below it). Each driver is
+linked with the app, so it calls the app freely, but into its own file
+(the COGS* and FUJI* segments): NEWSIIE.COGS ($FCD with its BSS, the
+larger) and NEWSIIE.FUJI. netdrv.c loads NEWSIIE.COGS and calls its find;
+if no CoGS card, NEWSIIE.FUJI the same way; if neither, the status bar
+says NO NETWORK CARD and fetches say NO COGS CARD OR FUJINET FOUND. A
+table carries a stamp (the app's __ONCE_RUN__ as linked), so a driver
+from another build is refused. tools/drvcheck.sh fails the build if the
+app imports a driver's symbol or one driver imports the other's.
+
+Memory: the CoGS build had 1,442 bytes of heap (147 over the 1,295 a
+file open needs). The slot costs what the CoGS code did, plus the loader
+and table (about 150 bytes, after a first C version with function
+pointers cost 471). To make room, ui.c's code moved into language-card
+RAM and two buffers always written before use (main.c's note,
+source_msg) into LOWBSS. The heap is 1,329: 34 bytes over. Anything new
+in main memory now needs room found for it first.
+
+The separate FujiNet build is gone: one `make disk` carries NEWSIIE.SYSTEM,
+both drivers, PROBE, FETCH and FNFETCH (the FujiNet probe, was the FujiNet
+build's FETCH.SYSTEM). The splash shows the build's commit.
+
+Tested: in Virtual ][ (no card), both drivers load and find nothing, the
+status bar says NO NETWORK CARD, a disk feed loads, a story saves and
+NEWSIIE.READ is written. On the //e through the LIRON, NEWSIIE.FUJI loads
+(FUJINET 172.16.16.10 on the status bar) and fetched BBC News (32 items)
+and Hacker News (20); CNN hit the firmware crash above at 96K.
+
+On the //e with the CoGS card (slot 5, no LIRON), the same disk booted
+from the CoGS network disk: NEWSIIE.COGS loads over the network disk
+(COGS 172.16.16.149 on the status bar); BBC News (29 items, 22K), Hacker
+News (20, 23K) and NASA (10, 246K) fetched; a story saved; quitting wrote
+NEWSIIE.READ and the selector listed the disk. PROBE.SYSTEM and all six
+FETCH.SYSTEM tests passed; FNFETCH.SYSTEM says no FujiNet and doesn't
+hang. An earlier run that evening gave TLS FAILED on Hacker News and an
+empty selector after quitting: the card's Wi-Fi was dropping TCP data to
+it at the time (pings answered, the Image Manager's replies went
+unacknowledged), and the same tests passed once it recovered.
+
+Untested: both cards installed. The code tries NEWSIIE.COGS first and
+keeps it if a CoGS card answers in any slot, so the CoGS card should win
+whichever device booted; cogs_find also reads the LIRON slot's $C0n1,
+$C0n5 and $C0n6 on the way down, which on an IWM-style card switch its
+phase lines. PT chose to leave this until it causes a problem.
+

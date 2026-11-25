@@ -1,10 +1,11 @@
 # Newsiie
 
 An RSS and Atom news reader for the Enhanced Apple //e, with the network
-done by a [CoGS](https://a2cogs.com) card. Written in cc65 C with ca65
-assembly for the screen.
+done by a [CoGS](https://a2cogs.com) card or a FujiNet. Written in cc65 C
+with ca65 assembly for the screen.
 
-Version 1.0: all eight milestones of [PLAN.md](PLAN.md) are built. Pick a
+Version 1.1: all eight milestones of [PLAN.md](PLAN.md) are built, and one
+disk now works with a CoGS card or a FujiNet. Pick a
 feed, read its headlines and summaries, add and delete feeds, keep track
 of what you have read, and save articles for ZipEdit. See
 [the manual](docs/MANUAL.md).
@@ -32,6 +33,20 @@ make host-test         # card protocol, text cleaner and feed fixtures, on the M
 make corpus            # the parser against ten live feeds
 make release           # build/newsiie-<version>.zip: the disk and the manual
 ```
+
+## CoGS card or FujiNet
+
+One disk serves both. At startup `NEWSIIE.SYSTEM` loads its network
+driver from the disk, `NEWSIIE.COGS` if a CoGS card is installed, else
+`NEWSIIE.FUJI` if a FujiNet is, into one slot of memory under the C stack
+(`src/netdrv.h`, `cfg/newsiie-app.cfg`). The FujiNet driver is newsiie's
+own SmartPort code (`src/fuji.c`), and `FNFETCH.SYSTEM` checks the device.
+Set up the FujiNet's Wi-Fi in its CONFIG first.
+
+FujiNet support is not finished: it reads feeds through a LIRON card, but
+a Yellowstone card refuses the SmartPort READ the network device needs,
+and with FujiNet firmware v1.6.1 a large feed can still reboot the
+FujiNet mid-fetch, which hangs the //e. See [PLAN.md](PLAN.md) section 12.
 
 ## Layout
 

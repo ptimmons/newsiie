@@ -45,11 +45,20 @@ REG_SYNC        = $C08A
 
 ST_TX_READY     = $40
 
+; In NEWSIIE.COGS (netdrv.h) the segments are the CoGS driver's.
+.ifdef NETDRV
+        .segment "COGSBSS"
+.else
         .bss
+.endif
 slotx:  .res    1               ; slot * 16
 putmid: .res    1               ; middle byte of the TX wait counter
 
+.ifdef NETDRV
+        .segment "COGSCODE"
+.else
         .code
+.endif
 
 ; void __fastcall__ cogs_set_slot(unsigned char slot)
 _cogs_set_slot:
