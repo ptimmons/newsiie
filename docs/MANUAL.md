@@ -24,10 +24,11 @@
 
 ## About This Guide
 
-Welcome to Newsiie. With Newsiie and a CoGS card, your Apple IIe can
+Welcome to Newsiie. With Newsiie and a CoGS card or a FujiNet, your
+Apple IIe can
 read the news from all over the world: the headlines from newspapers,
-magazines, scientists and hobbyists, delivered straight to your
-80-column screen.
+magazines, scientists and hobbyists, delivered straight to your 80-column
+screen.
 
 This guide shows you how. You don't need to know anything about
 computers or networks to use it. If you can put a disk in a drive and
@@ -82,24 +83,48 @@ To use Newsiie, you need
   card**. (The enhanced Apple IIe is best: it shows Newsiie's special
   symbols. An unenhanced Apple IIe works too, with plain letters in
   their place.)
-- a **CoGS card** installed in any slot, and connected to your network.
-- the **Newsiie disk**: on a floppy disk, a hard disk, or the CoGS
-  card's own network disk.
+- a way onto the Internet: either
+  - a **CoGS card** installed in any slot, and connected to your network,
+    or
+  - a **FujiNet**, connected to your Wi-Fi network, on a SmartPort card
+    that can read from it (see "Using a FujiNet," below).
+- the **Newsiie disk**: on a floppy disk, a hard disk, the CoGS card's own
+  network disk, or a disk on the FujiNet.
 
-> **Important:** Set up the CoGS card's network connection before you
-> start Newsiie, using the card's own configuration screen. The CoGS
-> card's manual tells you how. Newsiie uses the connection; it doesn't
-> set it up.
+> **Important:** Set up the network connection before you start Newsiie:
+> the CoGS card's on its own configuration screen, or the FujiNet's Wi-Fi
+> on its CONFIG screen. The card's or the FujiNet's manual tells you how.
+> Newsiie uses the connection; it doesn't set it up.
+
+The same Newsiie disk works with either. If both a CoGS card and a
+FujiNet are installed, Newsiie uses the CoGS card. (This hasn't been
+tried yet with both in one computer.)
+
+### Using a FujiNet
+
+A FujiNet on an Apple IIe is connected through a SmartPort card, and not
+every SmartPort card can read from the FujiNet's network device. Newsiie
+has been tested with a FujiNet on a **LIRON** card. A **Yellowstone** card
+refuses, and Newsiie says THIS SMARTPORT CARD CANNOT READ FROM THE
+FUJINET ($04) when you fetch a feed.
+
+> **Important:** With FujiNet firmware version 1.6.1, a large feed, such
+> as CNN's, can make the FujiNet restart in the middle of a fetch, and then
+> the Apple IIe stops until you turn it off and on again. Newsiie reads in
+> small pieces to make this rare, but only newer FujiNet firmware cures
+> it. Smaller feeds, such as the BBC's and Hacker News, have fetched
+> without trouble.
 
 ### Starting Newsiie
 
 1. Put the Newsiie disk in the startup drive, or choose it on your CoGS
-   card.
+   card or your FujiNet.
 2. Turn on the computer, or press CONTROL-OPEN-APPLE-RESET if it's
    already on.
 
 The title screen appears (you saw it on the cover of this guide). While
-it's showing, Newsiie finds your CoGS card and checks its connection.
+it's showing, Newsiie finds your CoGS card or FujiNet and checks its
+connection.
 
 3. Press any key to continue.
 
@@ -117,7 +142,9 @@ The bright bar along the bottom of the screen is the **status bar**. It
 tells you where you are and what Newsiie is doing. In Figure 1-1 it
 shows that seven feeds are in your list, that the CoGS card is connected
 (the numbers are its address on your network), and that you can press
-OPEN-APPLE-? for help at any time.
+OPEN-APPLE-? for help at any time. With a FujiNet, the status bar says
+FUJINET and its address instead, or FUJINET NO WI-FI if it isn't on your
+network yet.
 
 When Newsiie has something to tell you, its message takes over the
 status bar until you press the next key.
@@ -367,6 +394,8 @@ carries on: your list works as usual until you quit.
 > **Important:** If you start Newsiie from the CoGS card's network disk,
 > whether you can save depends on where the disk image is kept. The CoGS
 > Image Manager's shared folder accepts changes; many other places don't.
+> On a FujiNet, mount the Newsiie disk for reading and writing (R/W) on
+> the CONFIG screen; a disk mounted read-only can't be changed.
 
 ---
 
@@ -426,10 +455,20 @@ carries on: your list works as usual until you quit.
 These are the messages Newsiie may show on the status bar, what they
 mean, and what to do.
 
+### Finding Your Card or FujiNet
+
 **NO NETWORK CARD** or **NO COGS CARD OR FUJINET FOUND**
-Newsiie couldn't find a CoGS card. Make sure the card is firmly seated
-in its slot, then start Newsiie again. You can still read feeds saved
-as files on a disk.
+Newsiie couldn't find a CoGS card or a FujiNet. Make sure the card is
+firmly seated in its slot, or that the FujiNet is plugged in and turned
+on, then start Newsiie again. You can still read feeds saved as files on
+a disk.
+
+> **By the way:** Newsiie keeps the part of itself that talks to each
+> device in its own file, `NEWSIIE.COGS` or `NEWSIIE.FUJI`. If you copy
+> Newsiie to another disk, copy these files too, or Newsiie says NO
+> NETWORK CARD.
+
+### From the CoGS Card
 
 **WAITING FOR THE NETWORK**
 The CoGS card isn't connected to your network yet. This is normal for a
@@ -458,13 +497,59 @@ again in a minute; if it keeps happening, check the card's clock settings.
 The website didn't answer. It may be busy or out of service; try again
 later.
 
-**THE SERVER STOPPED SENDING**
-The website began sending the feed, then sent nothing for 30 seconds.
-You can read whatever arrived.
-
 **CARD STOPPED ANSWERING**
 The CoGS card didn't answer Newsiie for a minute. Turn the computer off
 and on again; if it keeps happening, run PROBE.SYSTEM (see Appendix C).
+
+### From the FujiNet
+
+**WAITING FOR THE FUJINET'S WI-FI**
+The FujiNet isn't on your Wi-Fi network yet. This is normal for a few
+seconds after you turn it on; Newsiie waits up to 20 seconds.
+
+**THE FUJINET IS NOT ON WI-FI (SET IT UP IN CONFIG)**
+**NO NETWORK: CHECK THE FUJINET'S WI-FI**
+Newsiie waited and the FujiNet still wasn't on your network, or it lost
+the network during a fetch. Check its Wi-Fi settings on the CONFIG
+screen.
+
+**CONNECTING (ESC STOPS ONCE THE SERVER ANSWERS)**
+**WAITING FOR THE SERVER, 5 S**
+The FujiNet is reaching the website. While it does, Newsiie can't stop
+it; an ESC you press then takes effect as soon as the website answers.
+
+**THIS SMARTPORT CARD CANNOT READ FROM THE FUJINET ($04)**
+The card the FujiNet is connected to refused to read from it. See "Using
+a FujiNet" in Chapter 1.
+
+**THE FUJINET DID NOT ANSWER, ERROR $nn**
+The SmartPort card couldn't reach the FujiNet. Check its cable, then turn
+the computer off and on again; if it keeps happening, run FNFETCH.SYSTEM
+(see Appendix C).
+
+**THE SERVER DID NOT ANSWER IN TIME**
+**THE SERVER REFUSED THE CONNECTION**
+**THE CONNECTION WAS CUT OFF**
+The website didn't answer, wouldn't let the FujiNet in, or stopped part
+way. Try again later.
+
+**THE SERVER REFUSED IT (ACCESS DENIED)**
+The website answered, but won't give out the feed. It may need a
+password, which Newsiie can't give.
+
+**THE FUJINET CANNOT USE THAT URL**
+The FujiNet didn't understand the feed's address. Check it for a typing
+mistake.
+
+**THE FUJINET REPORTED ERROR nnn**
+The FujiNet reported a problem Newsiie doesn't have a message for. The
+number is the FujiNet's own error code.
+
+### From Either One, or the Disk
+
+**THE SERVER STOPPED SENDING**
+The website began sending the feed, then sent nothing for 30 seconds.
+You can read whatever arrived.
 
 **THE SERVER REFUSED IT (OR NOT FOUND)**
 The website answered, but not with the feed. The feed may have moved.
@@ -530,11 +615,16 @@ A feed in your list is a ProDOS pathname, and that file isn't there.
 
 ### How Newsiie Uses Your Apple
 
-Newsiie is written in C and 6502 assembly language. The CoGS card does
-the hard work of the Internet: it finds websites, makes secure
-connections, and holds each feed while Newsiie reads it at its own pace,
-512 characters at a time. Newsiie sorts the feed into stories as it
-arrives, so it never needs to keep the whole feed in memory.
+Newsiie is written in C and 6502 assembly language. The CoGS card or
+the FujiNet does the hard work of the Internet: it finds websites, makes
+secure connections, and hands the feed to Newsiie a piece at a time, 512
+characters from the CoGS card and 256 from the FujiNet. Newsiie sorts the
+feed into stories as it arrives, so it never needs to keep the whole feed
+in memory.
+
+When it starts, Newsiie loads the part of itself that talks to the
+network from the disk: `NEWSIIE.COGS` first, and if there's no CoGS card,
+`NEWSIIE.FUJI`. Both use the same memory, so only one is ever loaded.
 
 The stories are stored in the Apple IIe's auxiliary memory, the second
 64K of your 128K. ProDOS normally keeps a small disk, `/RAM`, in that
@@ -542,22 +632,26 @@ memory; Newsiie turns `/RAM` off when it starts, and ProDOS turns it back
 on the next time you start up. Anything you had saved on `/RAM` is
 cleared.
 
-### Starting from the CoGS Network Disk
+### Starting from a Network Disk
 
-Newsiie works well when you start it from the CoGS card's network disk.
-The card carries both the disk and the feeds, so Newsiie takes care
-never to use the disk while a feed is arriving.
+Newsiie works well when you start it from the CoGS card's network disk
+or from a disk on the FujiNet. Then one device carries both the disk and
+the feeds, so Newsiie takes care never to use the disk while a feed is
+arriving.
 
-### Two Programs for Checking Your Card
+### Programs for Checking Your Card
 
-The Newsiie disk also has two programs for checking the CoGS card. To use
-them, quit Newsiie and choose one from the ProDOS menu.
+The Newsiie disk also has three programs for checking your network
+device. To use them, quit Newsiie and choose one from the ProDOS menu.
 
 - **PROBE.SYSTEM** checks the card from one end to the other: its slot,
   its version, its network connection, its clock, and the data it sends
   and receives.
-- **FETCH.SYSTEM** fetches six sample feeds from the Internet and reports
-  how long each took and what it contained.
+- **FETCH.SYSTEM** fetches six sample feeds through the CoGS card and
+  reports how long each took and what it contained.
+- **FNFETCH.SYSTEM** does the same for the FujiNet: it shows the
+  FujiNet's firmware version and address, fetches sample feeds, and
+  reports what the FujiNet answered at each step.
 
 ### The Files Newsiie Keeps
 
@@ -565,6 +659,8 @@ them, quit Newsiie and choose one from the ProDOS menu.
 |---|---|
 | `NEWSIIE.FEEDS` | your list of feeds, as text |
 | `NEWSIIE.READ` | the stories you've read |
+| `NEWSIIE.COGS` | the part of Newsiie that talks to a CoGS card |
+| `NEWSIIE.FUJI` | the part of Newsiie that talks to a FujiNet |
 
 ---
 
@@ -591,6 +687,7 @@ a feed reaches one.
 | Stories remembered as read | the last 256 | The oldest is forgotten, and shows its diamond again if it's still in the feed. |
 | Time to wait for a website | 30 seconds without new data | Newsiie stops, says THE SERVER STOPPED SENDING, and keeps what arrived. |
 | Time to wait for the CoGS card | 60 seconds for each answer | Newsiie stops and says CARD STOPPED ANSWERING. The card answers far sooner in practice; it times out a website itself and says so. |
+| Time to wait for the FujiNet | no limit Newsiie can set | Each request to the FujiNet runs until the FujiNet answers. The FujiNet times out a website itself and says so. |
 
 > **By the way:** A summary of 2,000 characters fills about one and a
 > half screens on the Article screen. Most feeds' summaries are far

@@ -891,6 +891,22 @@ Tested: in Virtual ][ (no card), both drivers load and find nothing, the
 status bar says NO NETWORK CARD, a disk feed loads, a story saves and
 NEWSIIE.READ is written. On the //e through the LIRON, NEWSIIE.FUJI loads
 (FUJINET 172.16.16.10 on the status bar) and fetched BBC News (32 items)
-and Hacker News (20); CNN hit the firmware crash above at 96K. The CoGS
-path is untested on hardware: PT will put the CoGS card back in.
+and Hacker News (20); CNN hit the firmware crash above at 96K.
+
+On the //e with the CoGS card (slot 5, no LIRON), the same disk booted
+from the CoGS network disk: NEWSIIE.COGS loads over the network disk
+(COGS 172.16.16.149 on the status bar); BBC News (29 items, 22K), Hacker
+News (20, 23K) and NASA (10, 246K) fetched; a story saved; quitting wrote
+NEWSIIE.READ and the selector listed the disk. PROBE.SYSTEM and all six
+FETCH.SYSTEM tests passed; FNFETCH.SYSTEM says no FujiNet and doesn't
+hang. An earlier run that evening gave TLS FAILED on Hacker News and an
+empty selector after quitting: the card's Wi-Fi was dropping TCP data to
+it at the time (pings answered, the Image Manager's replies went
+unacknowledged), and the same tests passed once it recovered.
+
+Untested: both cards installed. The code tries NEWSIIE.COGS first and
+keeps it if a CoGS card answers in any slot, so the CoGS card should win
+whichever device booted; cogs_find also reads the LIRON slot's $C0n1,
+$C0n5 and $C0n6 on the way down, which on an IWM-style card switch its
+phase lines. PT chose to leave this until it causes a problem.
 
